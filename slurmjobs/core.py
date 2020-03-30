@@ -5,15 +5,140 @@ import jinja2
 import pathtree
 from . import util
 
+__all__ = ['ShellBatch', 'SlurmBatch', 'PySlurmBatch']
+
 env = jinja2.Environment(
     loader=jinja2.PackageLoader('slurmjobs', 'templates'))
 env.filters['prettyjson'] = util.prettyjson
 env.filters['prefixlines'] = util.prefixlines
 
-SBATCH_DIR = 'sbatch'
 
 
-class SlurmBatch:
+
+class BaseBatch:
+    default_params = dict()
+    JOB_ID_KEY = 'job_id'
+    DEFAULT_JOB_TEMPLATE = None
+    DEFAULT_RUN_TEMPLATE = None
+
+    def __init__(self, command, name=None, root_dir='jobs', paths=None,
+                 cli_fmt=None, backup=True, **kw):
+        # name
+        self.command = command
+        self.name = name or util.command_to_name(command)
+
+        # paths
+        self.paths = paths or self.get_paths(self.name, root_dir)
+        if backup:
+            util.maybe_backup(self.paths.batch_dir)
+        else:
+            self.paths.batch_dir.rmglob(include=True)
+
+        # job arguments
+        self.job_args = dict(self.default_params, **kw)
+        self.cli_fmt = cli_fmt
+
+    def generate(self, params, verbose=False, **kw):
+        '''Generate slurm jobs for every combination of parameters.'''
+        # generate jobs
+        job_paths = [
+            self.generate_job(
+                util.get_job_name(self.name, pms),
+                verbose=verbose, **kw, **pms)
+            for pms in util.expand_param_grid(params)
+        ]
+
+        # generate run file
+        run_script = self.generate_run_script(
+            job_paths, params=dict(params, **kw), verbose=verbose)
+
+        # store the current timestamp
+        if 'time_generated' in self.paths.paths:
+            self.paths.time_generated.write(time.time())
+        return run_script, job_paths
+
+
+    def generate_job(self, job_name, *a, tpl=None, verbose=False, **params):
+        '''Generate a single slurm job file'''
+        # build command
+        paths = self.paths.specify(job_name=job_name)
+        params[self.JOB_ID_KEY] = job_name
+        args = util.Argument.get(self.cli_fmt).build(*a, **params)
+        command = f"{self.command} {args or ''}"
+
+        # generate job file
+        paths.job.up().make()
+        with open(paths.job, "w") as f:
+            f.write(get_template(tpl, self.DEFAULT_JOB_TEMPLATE).render(
+                job_name=job_name,
+                command=command,
+                paths=paths,
+                params=params,
+                **self.job_args,
+            ))
+
+        if verbose:
+            print('Command:\n\t', command)
+            print('Job File:', paths.job)
+            if 'output' in paths.paths:
+                print('Output File:', paths.output)
+            print()
+        return paths.job
+
+
+    def generate_run_script(self, job_paths, tpl=None, verbose=False, **kw):
+        '''Generate a job run script that will submit all jobs.'''
+        # Generate run script
+        file_path = self.paths.run
+        with open(file_path, "w") as f:
+            f.write(get_template(tpl, self.DEFAULT_RUN_TEMPLATE).render(
+                name=self.name,
+                command=self.command,
+                job_paths=job_paths,
+                paths=self.paths,
+                **self.job_args, **kw))
+        util.make_executable(file_path)
+
+        if verbose:
+            print(f'Wrote shell file to {file_path} with {len(job_paths)} jobs.')
+            print('To start, run:')
+            print(f'. {file_path}')
+            print()
+        return file_path
+
+    def get_paths(self, name, root_dir='jobs'):
+        raise NotImplementedError
+
+
+class ShellBatch(BaseBatch):
+    default_params = dict(
+        conda_env=None,
+        run_dir='.',
+    )
+
+    DEFAULT_JOB_TEMPLATE = 'shell.job.default.sh.j2'
+    DEFAULT_RUN_TEMPLATE = 'shell.run.default.sh.j2'
+
+    def get_paths(self, name, root_dir='sbatch', **kw):
+        paths = pathtree.tree(root_dir, {'{name}': {
+            '': 'batch_dir',
+            'jobs/{job_name}.sh': 'job',
+            'run_{name}.sh': 'run',
+            # optional
+            'output/{job_name}.log': 'output',
+            'time_generated': 'time_generated',
+        }}).update(name=name, **kw)
+        paths.output.up().make()
+        return paths
+
+
+class SlurmBatch(BaseBatch):
+    '''
+
+    batcher = SlurmBatch('my_script.py')
+    batcher = PySlurmBatch('my.module', m=True)
+
+    '''
     default_params = dict(
         n_gpus=1,
         conda_env=None,
@@ -30,85 +155,21 @@ class SlurmBatch:
         ),
     )
 
-    JOB_ID_KEY = 'job_id'
+    DEFAULT_JOB_TEMPLATE = 'job.default.sbatch.j2'
+    DEFAULT_RUN_TEMPLATE = 'run.default.sbatch.j2'
 
-    def __init__(self, command, name=None, sbatch_dir=SBATCH_DIR, paths=None,
-                 cli_fmt=None, backup=True, **kw):
-        self.command = command
-        self.name = name or util.command_to_name(command)
+    def get_paths(self, name, root_dir='sbatch', **kw):
+        paths = pathtree.tree(root_dir, {'{name}': {
+            '': 'batch_dir',
+            '{job_name}.sbatch': 'job',
+            'run_{name}.sh': 'run',
+            'slurm/slurm_%j__{job_name}.log': 'output',
+            'time_generated': 'time_generated',
+        }}).update(name=name, **kw)
+        paths.output.up().make()
+        print(paths)
+        return paths
 
-        self.paths = paths or get_paths(self.name, sbatch_dir, backup=backup)
-        self.sbatch_args = dict(self.default_params, **kw)
-        self.cli_fmt = cli_fmt
-
-    def generate(self, params, verbose=False, **kw):
-        '''Generate slurm jobs for every combination of parameters.'''
-        # generate jobs
-        job_paths = [
-            self.generate_job(
-                util.get_job_name(self.name, pms),
-                verbose=verbose, **kw, **pms)
-            for pms in util.expand_param_grid(params)
-        ]
-
-        # generate run file
-        run_script = self.generate_run_script(
-            job_paths, params=dict(params, **kw),
-            verbose=verbose)
-        self.paths.time_generated.write(time.time())
-        return run_script, job_paths
-
-
-    def generate_job(self, job_name, *a, tpl=None, verbose=False, **params):
-        '''Generate a single slurm job file'''
-        paths = self.paths.specify(job_name=job_name)
-        params[self.JOB_ID_KEY] = job_name
-        args = util.Argument.get(self.cli_fmt).build(*a, **params)
-        command = f"{self.command} {args or ''}"
-
-        with open(paths.job, "w") as f:
-            f.write(get_template(tpl, 'job.default.sbatch.j2').render(
-                job_name=job_name,
-                command=command,
-                output_path=paths.output,
-                params=params,
-                **self.sbatch_args,
-            ))
-
-        if verbose:
-            print('Command:\n\t', command)
-            print('SBatch File:', paths.job)
-            print('Slurm Output:', paths.output)
-            print()
-        return paths.job
-
-
-    def generate_run_script(self, job_paths, tpl=None, verbose=False, **kw):
-        '''Generate a slurm '''
-        # Open shell file
-        file_path = self.paths.run
-        with open(file_path, "w") as f:
-            f.write(get_template(tpl, 'run.default.sbatch.j2').render(
-                name=self.name,
-                command=self.command,
-                job_paths=job_paths,
-                **self.sbatch_args, **kw,
-            ))
-        util.make_executable(file_path)
-
-        if verbose:
-            print(f'Wrote shell file to {file_path} with {len(job_paths)} jobs.')
-            print('To start, run:')
-            print(f'. {file_path}')
-            print()
-        return file_path
-
-    # def run(self):
-    #     import subprocess
-    #     os.system(f'. {self.path.run.s}')
-    #
-    # def stop(self):
-    #     pass
 
 
 class PySlurmBatch(SlurmBatch):
@@ -130,20 +191,3 @@ class PySlurmBatch(SlurmBatch):
 
 def get_template(tpl, default):
     return jinja2.Template(tpl) if tpl else env.get_template(default)
-
-
-def get_paths(name, sbatch_dir=SBATCH_DIR, backup=True, **kw):
-    paths = pathtree.tree(sbatch_dir, {'{name}': {
-        '': 'batch_dir',
-        '{job_name}.sbatch': 'job',
-        'run_{name}.sh': 'run',
-        'slurm/slurm_%j__{job_name}.log': 'output',
-        'time_generated': 'time_generated',
-    }}).update(name=name, **kw)
-
-    if backup:
-        util.maybe_backup(paths.batch_dir)
-    else:
-        paths.batch_dir.rmglob(include=True)
-    paths.output.up().make()
-    return paths

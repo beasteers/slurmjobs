@@ -61,13 +61,12 @@ class Argument:
     def build(cls, *args, **kw):
         s_args = [cls.arg_fmt.format(arg=cls.format_value(v)) for v in args]
         s_kw = [cls.kw_fmt.format(key=k, value=cls.format_value(v)) for k, v in kw.items()]
-        return ' '.join(
-            [cls.prefix]*bool(cls.prefix) + s_args + s_kw +
-            [cls.suffix]*bool(cls.suffix))
+        args = [cls.prefix] + s_args + s_kw + [cls.suffix]
+        return ' '.join([a for a in args if a])
 
     @classmethod
     def format_value(cls, v):
-        return shlex.quote(repr(v))
+        return repr(v) #shlex.quote()
 
 class FireArgument(Argument):
     pass # same as default
@@ -79,7 +78,7 @@ class SacredArgument(Argument):
 class JsonArgument(Argument):
     @classmethod
     def format_value(cls, v):
-        return shlex.quote(json.dumps(v))
+        return json.dumps(v) #shlex.quote()
 
 
 '''

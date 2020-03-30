@@ -9,7 +9,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user={{ email }}
 {%- endif %}
-#SBATCH --output={{ output_path }}
+#SBATCH --output={{ paths.output }}
 {% for key, val in sbatch_options.items() -%}
 #SBATCH --{{ key|replace('_', '-') }}={{ val }}
 {% endfor %}

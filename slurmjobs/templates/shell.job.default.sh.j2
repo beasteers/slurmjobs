@@ -1,0 +1,38 @@
+{% block header -%}
+#########################
+#
+# Job: {{ job_name }}
+#
+#########################
+{% endblock %}
+
+
+
+{% block body -%}
+
+
+{% block environment -%}
+##### Setup Environment
+
+{% if conda_env -%}
+# activate conda environment
+. deactivate
+source activate {{ conda_env }}
+{% endif %}
+
+{%- endblock %}
+
+
+{% block cmd -%}
+##### Run Command
+
+cd {{ run_dir }}
+# run script with arguments
+nohup {{ command }} \
+    > {{ paths.output }} &
+
+{%- endblock %}
+
+
+
+{%- endblock %}

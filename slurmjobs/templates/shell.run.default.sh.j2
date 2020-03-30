@@ -1,0 +1,15 @@
+{% block header %}
+#########################
+#
+# Job Batch: {{ name }}
+# Params:
+{{ params|prettyjson|prefixlines('# ') }}
+#
+#########################
+{% endblock %}
+
+{% block body %}
+{% for path in job_paths -%}
+sbatch "{{ path }}"
+{% endfor %}
+{% endblock %}
