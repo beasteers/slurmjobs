@@ -11,6 +11,7 @@ env = jinja2.Environment(
     loader=jinja2.PackageLoader('slurmjobs', 'templates'))
 env.filters['prettyjson'] = util.prettyjson
 env.filters['prefixlines'] = util.prefixlines
+env.filters['comment'] = lambda x, ns=1, ch='#', nc=1: util.prefixlines(x, ch*nc+' '*ns)
 
 
 
@@ -21,11 +22,11 @@ class BaseBatch:
     DEFAULT_JOB_TEMPLATE = None
     DEFAULT_RUN_TEMPLATE = None
 
-    def __init__(self, command, name=None, root_dir='jobs', paths=None,
+    def __init__(self, cmd, name=None, root_dir='jobs', paths=None,
                  cli_fmt=None, backup=True, **kw):
         # name
-        self.command = command
-        self.name = name or util.command_to_name(command)
+        self.cmd = cmd
+        self.name = name or util.command_to_name(cmd)
 
         # paths
         self.paths = paths or self.get_paths(self.name, root_dir)
@@ -64,21 +65,21 @@ class BaseBatch:
         paths = self.paths.specify(job_name=job_name)
         params[self.JOB_ID_KEY] = job_name
         args = util.Argument.get(self.cli_fmt).build(*a, **params)
-        command = f"{self.command} {args or ''}"
+        cmd = f"{self.cmd} {args or ''}"
 
         # generate job file
         paths.job.up().make()
         with open(paths.job, "w") as f:
             f.write(get_template(tpl, self.DEFAULT_JOB_TEMPLATE).render(
                 job_name=job_name,
-                command=command,
+                command=cmd,
                 paths=paths,
                 params=params,
                 **self.job_args,
             ))
 
         if verbose:
-            print('Command:\n\t', command)
+            print('Command:\n\t', cmd)
             print('Job File:', paths.job)
             if 'output' in paths.paths:
                 print('Output File:', paths.output)
@@ -93,7 +94,7 @@ class BaseBatch:
         with open(file_path, "w") as f:
             f.write(get_template(tpl, self.DEFAULT_RUN_TEMPLATE).render(
                 name=self.name,
-                command=self.command,
+                command=self.cmd,
                 job_paths=job_paths,
                 paths=self.paths,
                 **self.job_args, **kw))
@@ -179,13 +180,13 @@ class PySlurmBatch(SlurmBatch):
     batcher = PySlurmBatch('my.module', m=True)
 
     '''
-    def __init__(self, command, *a, m=False, bin='python', **kw):
+    def __init__(self, cmd, *a, m=False, bin='python', **kw):
         # if isinstance(bin, (int, float)):
         #     bin = 'python{}'.format(bin)
-        command = (
-            '{} -m {}'.format(bin, command) if m else
-            '{} {}'.format(bin, command))
-        super().__init__(command, *a, **kw)
+        cmd = (
+            '{} -m {}'.format(bin, cmd) if m else
+            '{} {}'.format(bin, cmd))
+        super().__init__(cmd, *a, **kw)
 
 
 
