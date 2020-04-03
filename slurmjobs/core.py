@@ -1,5 +1,6 @@
 import pathtree
 from .base import BaseBatch
+from . import util
 
 __all__ = ['ShellBatch', 'SlurmBatch', 'PySlurmBatch']
 
@@ -27,7 +28,7 @@ class ShellBatch(BaseBatch):
 
 
 MODULE_PRESETS = {
-    'cuda': ['cudnn/9.0v7.3.0.29', 'cuda/9.0.176'],
+    'cuda9': ['cudnn/9.0v7.3.0.29', 'cuda/9.0.176'],
 }
 
 class SlurmBatch(BaseBatch):
@@ -43,18 +44,22 @@ class SlurmBatch(BaseBatch):
         run_dir='.',
         conda_version='5.3.1',
         email=None,
-        modules=[
-            'cudnn/9.0v7.3.0.29',
-            'cuda/9.0.176',
-        ],
+        modules=['cuda9'],
         sbatch_options=dict(
             time='7-0',
             mem='48GB',
         ),
     )
 
+    module_presets = MODULE_PRESETS
+
     DEFAULT_JOB_TEMPLATE = 'job.default.sbatch.j2'
     DEFAULT_RUN_TEMPLATE = 'run.default.sbatch.j2'
+
+    def __init__(self, *a, modules=None, **kw):
+        modules = util.flatten(
+            self.module_presets.get(m, m) for m in (modules or ()))
+        super().__init__(*a, modules=modules, **kw)
 
     def get_paths(self, name, root_dir='sbatch', **kw):
         paths = pathtree.tree(root_dir, {'{name}': {

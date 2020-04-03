@@ -1,6 +1,7 @@
 import os
 import json
 import shlex
+import types
 import itertools
 import collections
 
@@ -149,6 +150,10 @@ def dict_merge(*ds, depth=-1, **kw):
     return mdict
 
 
+def flatten(args, cls=(list, tuple, set, types.GeneratorType)):
+    if isinstance(args, cls):
+        return [a for arg in args for a in flatten(arg)]
+    return [args]
 '''
 
 Argument
@@ -165,15 +170,6 @@ class Factory:
 def all_subclasses(cls):
     return set(cls.__subclasses__()).union(
         s for c in cls.__subclasses__() for s in all_subclasses(c))
-
-
-DEFAULT_ARG_FILTER = ('', [], None, ())
-def flatten_args(args, remove=DEFAULT_ARG_FILTER):
-    if args in remove:
-        return ()
-    if isinstance(args, (list, tuple, set)):
-        return [str(a) for arg in args for a in flatten_args(arg, remove)]
-    return (args,)
 
 def shlex_repr(v):
     v = repr(v)

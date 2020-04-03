@@ -15,8 +15,11 @@ def test_basic():
         COMMAND, email=EMAIL,
         root_dir=os.path.join(ROOT, 'slurm'),
         conda_env=CONDA_ENV,
+        modules=['cuda9'],
         backup=False)
     assert batcher.name == NAME
+
+    assert all(m in batcher.job_args['modules'] for m in slurmjobs.core.MODULE_PRESETS['cuda9'])
 
     # generate scripts
     run_script, job_paths = batcher.generate([

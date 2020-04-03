@@ -20,11 +20,12 @@ class Argument(util.Factory):
 
     @classmethod
     def build(cls, *args, **kw):
-        return ' '.join(util.flatten_args(
+        arglist = util.flatten(
             [cls.prefix] +
             [cls.format_arg(v) for v in args] +
             [cls.format_arg(k, v) for k, v in kw.items()] +
-            [cls.suffix]))
+            [cls.suffix])
+        return ' '.join(str(a) for a in arglist if a)
 
     @classmethod
     def format_arg(cls, k, v=NoArgVal):
