@@ -1,7 +1,7 @@
 # slurmjobs
 Automating Slurm job generation.
 
-Generate a set of `.sbatch` files over a grid of parameters to be searched over (`SlurmBatch(...).generate(...)`). A run script is created which will submit all generated jobs as once.
+Generate a set of `.sbatch` files over a grid of parameters to be searched over (`SlurmBatch(cmd, **opts).generate(params)`). A run script is created which will submit all generated jobs as once.
 
 You can also use `ShellBatch` which removes the slurm/module references so you can test & run on your local machine or test server.
 
@@ -66,7 +66,7 @@ An example command:
    python train.py --kernel-size=2 --nb_stacks=1
 ```
 
-See below for sample files.
+See [below](#sample) for sample files.
 
 ## Notes and Caveats
 Basically, I built this package to address my own use cases:
