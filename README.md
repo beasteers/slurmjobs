@@ -1,7 +1,7 @@
 # slurmjobs
 Automating Slurm job generation.
 
-Generate a set of `.sbatch` files over a grid of parameters to be searched over (`SlurmBatch(...).generate(...)`). A run script is created which will submit all generated jobs as once.
+Generate a set of `.sbatch` files over a grid of parameters to be searched over (`SlurmBatch(cmd, **opts).generate(params)`). A run script is created which will submit all generated jobs as once.
 
 You can also use `ShellBatch` which removes the slurm/module references so you can test & run on your local machine or test server.
 
