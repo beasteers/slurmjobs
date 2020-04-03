@@ -66,4 +66,22 @@ def test_shell():
     assert all(x in run_content for x in job_paths)
 
 def test_arg_format():
-    pass
+    Args = slurmjobs.args.Argument
+    assert Args.get('fire') == slurmjobs.args.FireArgument
+    assert Args.get('argparse') == slurmjobs.args.ArgparseArgument
+    assert Args.get('sacred') == slurmjobs.args.SacredArgument
+
+    arg = Args.get('fire').build(
+        5, 'hi', 'hi hey', arg1=[1, 2], a='asdf', b='asdf adf')
+    print('fire', arg)
+    assert arg == "5 hi 'hi hey' --arg1='[1, 2]' --a=asdf --b='asdf adf'"
+
+    arg = Args.get('argparse').build(
+        'hi', flag=True, other=False, arg1=[1, 2], a='asdf', b='asdf adf')
+    print('argparse', arg)
+    assert arg == "--hi --flag --arg1 1 2 -a asdf -b 'asdf adf'"
+
+    arg = Args.get('sacred').build(
+        'hi', 'hi hey', arg1=[1, 2], a='asdf', b='asdf adf')
+    print('sacred', arg)
+    assert arg == "with hi 'hi hey' arg1='[1, 2]' a=asdf b='asdf adf'"

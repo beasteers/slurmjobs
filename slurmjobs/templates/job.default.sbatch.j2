@@ -11,9 +11,10 @@
 {%- endif %}
 #SBATCH --output={{ paths.output }}
 {% for key, val in sbatch_options.items() -%}
-#SBATCH --{{ key|replace('_', '-') }}={{ val }}
+    #SBATCH --{{ key|replace('_', '-') }}={{ val }}
 {% endfor %}
 {% endblock -%}
+
 {% block header -%}
 #########################
 #
@@ -23,21 +24,24 @@
 {% endblock %}
 
 {% block body -%}
+
 {% block modules -%}
 ##### Load Modules
-module purge
-{% for module in modules -%}
-module load {{ module }}
-{% endfor %}
+{% if modules -%}
+    module purge
+    {% for module in modules -%}
+        module load {{ module }}
+    {% endfor %}
+{% endif %}
 {% endblock %}
 
 {% block environment -%}
 ##### Setup Environment
 {% if conda_env -%}
-# activate conda environment
-module load anaconda3/{{ conda_version }}
-. deactivate
-source activate {{ conda_env }}
+    # activate conda environment
+    module load anaconda3/{{ conda_version }}
+    . deactivate
+    source activate {{ conda_env }}
 {% endif %}
 {% endblock %}
 
@@ -47,4 +51,5 @@ cd {{ run_dir }}
 # run script with arguments
 {{ command }}
 {% endblock %}
+
 {% endblock %}

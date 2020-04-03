@@ -39,50 +39,6 @@ def format_value_for_name(x):
 
 '''
 
-Argument Formatters
-
-'''
-
-
-class Argument:
-    prefix = suffix = ''
-    arg_fmt = '{arg}'
-    kw_fmt = '--{key}={value}'
-
-    @classmethod
-    def get(cls, key=None):
-        # key=fire -> FireArgument, key=None -> Argument
-        return {
-            cls.__name__.lower():
-            c for c in cls.__subclasses__()
-        }.get('{}argument'.format(key or '').lower(), cls)
-
-    @classmethod
-    def build(cls, *args, **kw):
-        s_args = [cls.arg_fmt.format(arg=cls.format_value(v)) for v in args]
-        s_kw = [cls.kw_fmt.format(key=k, value=cls.format_value(v)) for k, v in kw.items()]
-        args = [cls.prefix] + s_args + s_kw + [cls.suffix]
-        return ' '.join([a for a in args if a])
-
-    @classmethod
-    def format_value(cls, v):
-        return repr(v) #shlex.quote()
-
-class FireArgument(Argument):
-    pass # same as default
-
-class SacredArgument(Argument):
-    prefix = 'with'
-    kw_fmt = '{key}={value}'
-
-class JsonArgument(Argument):
-    @classmethod
-    def format_value(cls, v):
-        return json.dumps(v) #shlex.quote()
-
-
-'''
-
 Parameter Expansion
 
 '''
@@ -191,3 +147,43 @@ def dict_merge(*ds, depth=-1, **kw):
     for d in ds + (kw,):
         merge(mdict, d, depth=depth)
     return mdict
+
+
+'''
+
+Argument
+
+'''
+
+class Factory:
+    @classmethod
+    def __children__(cls, prefix='', suffix=''):
+        return {
+            stripstr(c.__name__.lower(), prefix, suffix): c
+            for c in all_subclasses(cls)}
+
+def all_subclasses(cls):
+    return set(cls.__subclasses__()).union(
+        s for c in cls.__subclasses__() for s in all_subclasses(c))
+
+
+DEFAULT_ARG_FILTER = ('', [], None, ())
+def flatten_args(args, remove=DEFAULT_ARG_FILTER):
+    if args in remove:
+        return ()
+    if isinstance(args, (list, tuple, set)):
+        return [str(a) for arg in args for a in flatten_args(arg, remove)]
+    return (args,)
+
+def shlex_repr(v):
+    v = repr(v)
+    # if v is a quoted string, remove the quotes
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in '"\'':
+        v = v[1:-1]
+    return shlex.quote(v) # only quote if necessary (has spaces or bash chars)
+
+
+def stripstr(text, prefix='', suffix=''):
+    text = text[len(prefix):] if prefix and text.startswith(prefix) else text
+    text = text[:-len(suffix)] if suffix and text.endswith(suffix) else text
+    return text
