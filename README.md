@@ -66,7 +66,7 @@ An example command:
    python train.py --kernel-size=2 --nb_stacks=1
 ```
 
-See below for sample files.
+See [below](#sample) for sample files.
 
 ## Notes and Caveats
 Basically, I built this package to address my own use cases:
