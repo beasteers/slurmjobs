@@ -1,7 +1,7 @@
 # slurmjobs
 Automating Slurm job generation.
 
-Generate a set of `.sbatch` files over a grid of parameters to be searched over (`SlurmBatch(cmd, **opts).generate(params)`). A run script is created which will submit all generated jobs as once.
+Generate a set of `.sbatch` files over a grid of parameters to be searched over. A run script is created which will submit all generated jobs as once.
 
 You can also use `ShellBatch` which removes the slurm/module references so you can test & run on your local machine or test server.
 
@@ -28,6 +28,8 @@ run_script, job_paths = batch.generate([
     ('lr', [1e-4, 1e-3]),
 ], receptive_field=6)
 
+# ** everything was generated ** - now let's see the outputted paths.
+
 print('I just generated', len(job_paths), 'job scripts:')
 for p in job_paths:
     print('\t', p)
@@ -37,7 +39,6 @@ print('To submit all jobs, run:')
 print('.', run_script)
 print()
 
-#
 print('An example command:\n\t',
   batch.make_command(kernel_size=2, nb_stacks=1))
 
