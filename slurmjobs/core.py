@@ -85,7 +85,7 @@ class PySlurmBatch(SlurmBatch):
     def __init__(self, cmd, *a, m=False, bin='python', **kw):
         # if isinstance(bin, (int, float)):
         #     bin = 'python{}'.format(bin)
-        cmd = (
+        name, cmd = cmd, (
             '{} -m {}'.format(bin, cmd) if m else
             '{} {}'.format(bin, cmd))
-        super().__init__(cmd, *a, **kw)
+        super().__init__(cmd, name, *a, **kw)

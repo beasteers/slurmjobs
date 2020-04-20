@@ -81,6 +81,9 @@ class BaseBatch:
                 **self.job_args,
             ))
 
+        if 'output' in paths.paths:
+            paths.output.up().make()
+
         if verbose:
             print('Command:\n\t', cmd)
             print('Job File:', paths.job)
