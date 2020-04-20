@@ -4,8 +4,6 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task={{ n_cpus|default(n_gpus) }}
 #SBATCH --gres=gpu:{{ n_gpus }}
-#SBATCH --time={{ time }}
-#SBATCH --mem={{ mem }}
 {% if email -%}
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user={{ email }}
