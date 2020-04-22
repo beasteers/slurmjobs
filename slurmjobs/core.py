@@ -29,6 +29,7 @@ class ShellBatch(BaseBatch):
 
 MODULE_PRESETS = {
     'cuda9': ['cudnn/9.0v7.3.0.29', 'cuda/9.0.176'],
+    'cuda10': ['cuda/10.0.130', 'cudnn/10.0v7.4.2.24'],
 }
 
 class SlurmBatch(BaseBatch):
@@ -44,7 +45,7 @@ class SlurmBatch(BaseBatch):
         run_dir='.',
         conda_version='5.3.1',
         email=None,
-        modules=['cuda9'],
+        modules=[],
         sbatch_options=dict(
             time='7-0',
             mem='48GB',
