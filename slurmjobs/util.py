@@ -34,7 +34,7 @@ def format_value_for_name(x):
     if isinstance(x, dict):
         return '_'.join('{}-{}'.format(k, v) for k, v in sorted(dict.items()))
     if isinstance(x, (list, tuple)):
-        return '({})'.format(','.join(x))
+        return '({})'.format(','.join(map(str, x)))
     return x
 
 
