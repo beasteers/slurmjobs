@@ -6,9 +6,10 @@ __all__ = ['ShellBatch', 'SlurmBatch', 'PySlurmBatch']
 
 
 class ShellBatch(BaseBatch):
-    default_params = dict(
+    default_options = dict(
         conda_env=None,
         run_dir='.',
+        init_script='',
     )
 
     DEFAULT_JOB_TEMPLATE = 'shell.job.default.sh.j2'
@@ -30,6 +31,7 @@ class ShellBatch(BaseBatch):
 MODULE_PRESETS = {
     'cuda9': ['cudnn/9.0v7.3.0.29', 'cuda/9.0.176'],
     'cuda10': ['cuda/10.0.130', 'cudnn/10.0v7.4.2.24'],
+    'cuda10.1': ['cuda/10.1.105', 'cudnn/10.1v7.6.5.32'],
 }
 
 class SlurmBatch(BaseBatch):
@@ -39,8 +41,9 @@ class SlurmBatch(BaseBatch):
     batcher = PySlurmBatch('my.module', m=True)
 
     '''
-    default_params = dict(
-        n_gpus=1,
+    default_options = dict(
+        ngpus=0,
+        ncpus=1,
         conda_env=None,
         run_dir='.',
         conda_version='5.3.1',
@@ -50,6 +53,7 @@ class SlurmBatch(BaseBatch):
             time='7-0',
             mem='48GB',
         ),
+        init_script='',
     )
 
     module_presets = MODULE_PRESETS

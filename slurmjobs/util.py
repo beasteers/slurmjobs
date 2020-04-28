@@ -6,6 +6,18 @@ import itertools
 import collections
 
 
+
+def summary(run_path, job_paths):
+    print('Generated', len(job_paths), 'job scripts:')
+    for p in job_paths:
+        print('\t', p)
+    print()
+
+    print('To submit all jobs, run:')
+    print('.', run_script)
+    print()
+
+
 '''
 
 Naming Transformers
@@ -165,7 +177,8 @@ class Factory:
     def __children__(cls, prefix='', suffix=''):
         return {
             stripstr(c.__name__.lower(), prefix, suffix): c
-            for c in all_subclasses(cls)}
+            for c in all_subclasses(cls)
+            if not c.__name__.startswith('_')}
 
 def all_subclasses(cls):
     return set(cls.__subclasses__()).union(

@@ -13,7 +13,7 @@ env.filters['comment'] = lambda x, ns=1, ch='#', nc=1: util.prefixlines(x, ch*nc
 
 
 class BaseBatch:
-    default_params = dict()
+    default_options = dict()
     JOB_ID_KEY = 'job_id'
     DEFAULT_JOB_TEMPLATE = None
     DEFAULT_RUN_TEMPLATE = None
@@ -33,7 +33,7 @@ class BaseBatch:
                 self.paths.batch_dir.rmglob(include=True)
 
         # job arguments
-        self.job_args = dict(self.default_params, **kw)
+        self.job_args = dict(self.default_options, **kw)
         self.cli_fmt = cli
 
     def make_args(self, *a, **kw):
