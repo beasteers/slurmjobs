@@ -26,7 +26,7 @@ class BaseBatch:
 
         # paths
         self.paths = paths or self.get_paths(self.name, root_dir)
-        if 'batch_dir' in self.paths:
+        if 'batch_dir' in self.paths and len(self.paths.batch_dir.join('*').glob()):
             if backup:
                 util.maybe_backup(self.paths.batch_dir)
             else:

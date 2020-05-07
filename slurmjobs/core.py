@@ -24,7 +24,6 @@ class ShellBatch(BaseBatch):
             'output/{job_name}.log': 'output',
             'time_generated': 'time_generated',
         }}).update(name=name, **kw)
-        paths.output.up().make()
         return paths
 
 
@@ -74,8 +73,6 @@ class SlurmBatch(BaseBatch):
             'slurm/slurm_%j__{job_name}.log': 'output',
             'time_generated': 'time_generated',
         }}).update(name=name, **kw)
-        paths.output.up().make()
-        print(paths)
         return paths
 
 
