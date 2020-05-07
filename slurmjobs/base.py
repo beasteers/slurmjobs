@@ -42,20 +42,22 @@ class BaseBatch:
     def make_command(self, *a, **kw):
         return '{} {}'.format(self.cmd, self.make_args(*a, **kw))
 
-    def generate(self, params, verbose=False, job_tpl=None, run_tpl=None, **kw):
+    def generate(self, params=None, verbose=False, job_tpl=None, run_tpl=None, **kw):
         '''Generate slurm jobs for every combination of parameters.'''
         # generate jobs
         job_paths = [
             self.generate_job(
                 util.get_job_name(self.name, pms),
                 verbose=verbose, tpl=job_tpl, **kw, **pms)
-            for pms in util.expand_param_grid(params)
+            for pms in (
+                util.expand_param_grid(params)
+                if params is not None else [{}])
         ]
 
         # generate run file
         run_script = self.generate_run_script(
-            job_paths, params=dict(params, **kw), tpl=run_tpl,
-            verbose=verbose)
+            job_paths, params=dict(params, **kw) if params else kw,
+            tpl=run_tpl, verbose=verbose)
 
         # store the current timestamp
         if 'time_generated' in self.paths.paths:

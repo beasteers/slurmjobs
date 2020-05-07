@@ -28,6 +28,7 @@ def test_basic():
         ('lr', [1e-4, 1e-3]),
     ], receptive_field=6)
     print(run_script, job_paths)
+    assert len(job_paths) == 2 * 2 * 3
 
     # check job files
     job_paths = batcher.paths.job.glob()
@@ -38,6 +39,11 @@ def test_basic():
     # check run file
     run_content = batcher.paths.run.read()
     assert all(x in run_content for x in job_paths)
+
+    # test single generate
+    run_script, job_paths = batcher.generate(receptive_field=6)
+    print(run_script, job_paths)
+    assert len(job_paths) == 1
 
 def test_shell():
     NAME = 'some.thing'

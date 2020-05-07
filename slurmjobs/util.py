@@ -30,12 +30,13 @@ def command_to_name(command):
 
 def get_job_name(name, params, job_name_tpl=None, allowed=",._-"):
     # Define job name using the batch name and job parameters
-    params = {k: format_value_for_name(v) for k, v in params.items()}
-    param_names, param_vals = zip(*sorted(params.items()))
-    job_name_tpl = job_name_tpl or make_job_name_tpl(param_names)
-    job_name = name + ',' + job_name_tpl.format(*param_vals, **params)
-    job_name = ''.join(x for x in job_name if (x.isalnum() or x in allowed))
-    return job_name
+    if params:
+        params = {k: format_value_for_name(v) for k, v in params.items()}
+        param_names, param_vals = list(zip(*sorted(params.items())))
+        job_name_tpl = job_name_tpl or make_job_name_tpl(param_names)
+        name = name + ',' + job_name_tpl.format(*param_vals, **params)
+    name = ''.join(x for x in name if (x.isalnum() or x in allowed))
+    return name
 
 def make_job_name_tpl(names):
     # create a python format string for all parameters
