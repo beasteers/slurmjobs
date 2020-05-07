@@ -19,7 +19,7 @@ class BaseBatch:
     DEFAULT_RUN_TEMPLATE = None
 
     def __init__(self, cmd, name=None, root_dir='jobs', paths=None,
-                 cli=None, backup=True, **kw):
+                 cli=None, backup=True, job_id=True, **kw):
         # name
         self.cmd = cmd
         self.name = name or util.command_to_name(cmd)
@@ -33,6 +33,8 @@ class BaseBatch:
                 self.paths.batch_dir.rmglob(include=True)
 
         # job arguments
+        if not job_id:
+            self.JOB_ID_KEY = None
         self.job_args = dict(self.default_options, **kw)
         self.cli_fmt = cli
 
@@ -71,7 +73,8 @@ class BaseBatch:
         '''Generate a single slurm job file'''
         # build command
         paths = self.paths.specify(job_name=job_name)
-        params[self.JOB_ID_KEY] = job_name
+        if self.JOB_ID_KEY:
+            params[self.JOB_ID_KEY] = job_name
         cmd = self.make_command(*a, **params)
 
         # generate job file
