@@ -7,7 +7,7 @@ import collections
 
 
 
-def summary(run_path, job_paths):
+def summary(run_script, job_paths):
     print('Generated', len(job_paths), 'job scripts:')
     for p in job_paths:
         print('\t', p)

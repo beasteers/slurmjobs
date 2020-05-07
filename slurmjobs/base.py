@@ -120,6 +120,11 @@ class BaseBatch:
     def get_paths(self, name, root_dir='jobs'):
         raise NotImplementedError
 
+    def summary(self):
+        print('Name:', self.name)
+        print('Command:', self.name)
+        util.summary((self.paths.run.glob() or [None])[0], self.paths.job.glob())
+
 
 def get_template(tpl, default):
     return jinja2.Template(tpl) if tpl else env.get_template(default)
