@@ -9,7 +9,7 @@ env.filters['prettyjson'] = util.prettyjson
 env.filters['prefixlines'] = util.prefixlines
 env.filters['comment'] = lambda x, ns=1, ch='#', nc=1: util.prefixlines(x, ch*nc+' '*ns)
 
-
+IGNORE = object()
 
 
 class BaseBatch:
@@ -42,15 +42,17 @@ class BaseBatch:
     def make_command(self, *a, **kw):
         return '{} {}'.format(self.cmd, self.make_args(*a, **kw))
 
-    def generate(self, params=None, verbose=False, job_tpl=None, run_tpl=None, **kw):
+    def generate(self, params=None, verbose=False, job_tpl=None, run_tpl=None,
+                 ignore=IGNORE, kwargs=None, **kw):
         '''Generate slurm jobs for every combination of parameters.'''
+        kw = dict(kw, **(kwargs or {})) # for taken keys.
         # generate jobs
         job_paths = [
             self.generate_job(
                 util.get_job_name(self.name, pms),
                 verbose=verbose, tpl=job_tpl, **kw, **pms)
             for pms in (
-                util.expand_param_grid(params)
+                util.expand_param_grid(params, ignore=ignore)
                 if params is not None else [{}])
         ]
 

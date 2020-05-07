@@ -56,8 +56,9 @@ def format_value_for_name(x):
 Parameter Expansion
 
 '''
+NOTHING = object()
 
-def expand_param_grid(params):
+def expand_param_grid(params, ignore=NOTHING):
     '''
     e.g.
     params = [
@@ -80,7 +81,20 @@ def expand_param_grid(params):
     for ps in itertools.product(*param_grid):
         yield expand_paired_params(zip(param_names, ps))
 
-def expand_paired_params(params):
+def expand_paired_params(params, ignore=NOTHING):
+    '''Flatten tuple dict key/value pairs
+    e.g.
+    assert (
+        expand_paired_params([
+            ('latent_dim', 2),
+            (('a', 'b'), (1, 2)),
+            ('lets_overfit', True)
+        ])
+        == {'latent_dim': 1, 'a': 1, 'b': 2, 'lets_overfit': True},)
+    '''
+    return {n: v for n, v in unpack(params) if v is not ignore}
+
+def unpack(params):
     '''Flatten tuple dict key/value pairs
     e.g.
     assert (
@@ -92,16 +106,13 @@ def expand_paired_params(params):
         == {'latent_dim': 1, 'a': 1, 'b': 2, 'lets_overfit': True},)
     '''
     params = params.items() if isinstance(params, dict) else params
-    ps = {}
     for n, v in params:
         if isinstance(n, tuple):
             # ((a, b), (1, 2)) =>
             for ni, vi in zip(n, v):
-                ps[ni] = vi
+                yield ni, vi
         else:
-            ps[n] = v
-    return ps
-
+            yield n, v
 
 '''
 
