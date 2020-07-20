@@ -130,7 +130,7 @@ def make_executable(file_path):
 def maybe_backup(path):
     # create backup
     if path.exists():
-        bkp_previous_path = path.next_unique(1)
+        bkp_previous_path = path.prefix('~').next_unique(1)
         os.rename(path, bkp_previous_path)
         print('moved existing', path, 'to', bkp_previous_path)
 
