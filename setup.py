@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(name='slurmjobs',
-                 version='0.0.16',
+                 version='0.0.17',
                  description='Generate slurm jobs in batches.',
                  long_description=open('README.md').read().strip(),
                  long_description_content_type='text/markdown',

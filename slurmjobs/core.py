@@ -33,6 +33,7 @@ MODULE_PRESETS = {
     'cuda10.1': ['cuda/10.1.105', 'cudnn/10.1v7.6.5.32'],
 }
 
+
 class SlurmBatch(BaseBatch):
     '''
 
@@ -41,8 +42,8 @@ class SlurmBatch(BaseBatch):
 
     '''
     default_options = dict(
-        ngpus=0,
-        ncpus=1,
+        n_gpus=0,
+        n_cpus=1,
         conda_env=None,
         run_dir='.',
         conda_version='5.3.1',
@@ -76,7 +77,6 @@ class SlurmBatch(BaseBatch):
         return paths
 
 
-
 class PySlurmBatch(SlurmBatch):
     '''
 
@@ -84,6 +84,7 @@ class PySlurmBatch(SlurmBatch):
     batcher = PySlurmBatch('my.module', m=True)
 
     '''
+
     def __init__(self, cmd, *a, m=False, bin='python', **kw):
         # if isinstance(bin, (int, float)):
         #     bin = 'python{}'.format(bin)
