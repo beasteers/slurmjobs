@@ -3,7 +3,7 @@
 #SBATCH --job-name={{ job_name }}
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task={{ n_cpus|default(n_gpus or 1) }}
-#SBATCH --gres=gpu:{{ ngpus }}
+#SBATCH --gres=gpu:{{ n_gpus }}
 {% if email -%}
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user={{ email }}

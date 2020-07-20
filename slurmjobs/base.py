@@ -33,8 +33,8 @@ class BaseBatch:
                 self.paths.batch_dir.rmglob(include=True)
 
         # job arguments
-        if not job_id:
-            self.JOB_ID_KEY = None
+        if job_id is not True:
+            self.JOB_ID_KEY = job_id or None
         self.job_args = dict(self.default_options, **kw)
         self.cli_fmt = cli
 
