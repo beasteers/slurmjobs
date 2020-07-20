@@ -19,7 +19,7 @@ class ShellBatch(BaseBatch):
         paths = pathtree.tree(root_dir, {'{name}': {
             '': 'batch_dir',
             'jobs/{job_name}.sh': 'job',
-            'run_{name}.sh': 'run',
+            'run.sh': 'run',
             # optional
             'output/{job_name}.log': 'output',
             'time_generated': 'time_generated',
@@ -69,7 +69,7 @@ class SlurmBatch(BaseBatch):
         paths = pathtree.tree(root_dir, {'{name}': {
             '': 'batch_dir',
             '{job_name}.sbatch': 'job',
-            'run_{name}.sh': 'run',
+            'run.sh': 'run',
             'slurm/slurm_%j__{job_name}.log': 'output',
             'time_generated': 'time_generated',
         }}).update(name=name, **kw)
