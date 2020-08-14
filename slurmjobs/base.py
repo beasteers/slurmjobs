@@ -47,7 +47,7 @@ class BaseBatch:
         return Argument.get(self.cli_fmt).build(cmd, *a, **kw)
 
     def generate(self, params=None, verbose=False, job_tpl=None, run_tpl=None,
-                 kwargs=None, **kw):
+                 kwargs=None, summary=False, **kw):
         '''Generate slurm jobs for every combination of parameters.'''
         kw = dict(kw, **(kwargs or {})) # for taken keys.
         # generate jobs
@@ -68,6 +68,9 @@ class BaseBatch:
         # store the current timestamp
         if 'time_generated' in self.paths.paths:
             self.paths.time_generated.write(time.time())
+
+        if summary:
+            util.summary(run_script, job_paths)
         return run_script, job_paths
 
 
