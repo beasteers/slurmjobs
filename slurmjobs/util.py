@@ -58,7 +58,7 @@ Parameter Expansion
 '''
 NOTHING = object()
 
-def expand_param_grid(params, ignore=NOTHING):
+def expand_grid(params, ignore=NOTHING):
     '''
     e.g.
     params = [
@@ -66,7 +66,7 @@ def expand_param_grid(params, ignore=NOTHING):
         (('a', 'b'), [ (1, 3), (2, 5) ]),
         ('lets_overfit', (True,))
     ]
-    assert list(expand_paired_params(params)) == [
+    assert list(expand_grid(params)) == [
         {'latent_dim': 1, 'a': 1, 'b': 3, 'lets_overfit': True},
         {'latent_dim': 1, 'a': 2, 'b': 5, 'lets_overfit': True},
         {'latent_dim': 2, 'a': 1, 'b': 3, 'lets_overfit': True},
@@ -75,6 +75,9 @@ def expand_param_grid(params, ignore=NOTHING):
         {'latent_dim': 4, 'a': 2, 'b': 5, 'lets_overfit': True},
     ]
     '''
+    return list(_iter_expand_grid(params))
+
+def _iter_expand_grid(params):
     param_names, param_grid = zip(*(
         params.items() if isinstance(params, dict) else params))
 

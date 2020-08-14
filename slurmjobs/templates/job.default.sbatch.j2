@@ -1,7 +1,7 @@
 #!/bin/bash
 {% block arguments -%}
 #SBATCH --job-name={{ job_name }}
-#SBATCH --nodes=1
+#SBATCH --nodes={{ nodes|default(1) }}
 #SBATCH --cpus-per-task={{ n_cpus|default(n_gpus or 1) }}
 #SBATCH --gres=gpu:{{ n_gpus }}
 {% if email -%}
@@ -23,7 +23,8 @@
 {% endblock %}
 
 {% block body -%}
-{{ init_script }}
+
+. ~/.bashrc
 
 {% block modules -%}
 ##### Load Modules
@@ -46,6 +47,7 @@
 {% endblock %}
 
 {% block cmd -%}
+{{ init_script }}
 ##### Run Command
 cd {{ run_dir }}
 # run script with arguments

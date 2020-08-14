@@ -44,6 +44,7 @@ class SlurmBatch(BaseBatch):
     default_options = dict(
         n_gpus=0,
         n_cpus=1,
+        nodes=1,
         conda_env=None,
         run_dir='.',
         conda_version='5.3.1',

@@ -9,6 +9,8 @@
 {% endblock %}
 
 {% block body %}
+{{ run_init_script }}
+
 {% for path in job_paths -%}
     sbatch "{{ path }}"
 {% endfor %}

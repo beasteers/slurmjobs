@@ -3,7 +3,7 @@ Automating Slurm job generation.
 
 Generate a set of `.sbatch` files over a grid of parameters to be searched over. A run script is created which will submit all generated jobs as once.
 
-You can also use `ShellBatch` which removes the slurm/module references so you can test & run on your local machine or test server.
+You can also use `ShellBatch` which excludes the slurm/module references so you can test & run on your local machine or test server.
 
 ## Install
 
@@ -19,7 +19,13 @@ import slurmjobs
 batch = slurmjobs.SlurmBatch(
     'python train.py',
     email='me@something.com',
-    conda_env='my_env')
+    conda_env='my_env',
+    init_script='''
+echo "hi! I'm running before the main command!"
+echo "you can do initialization stuff here. but no pressure. it's completely optional."
+# NOTE: this runs after modules are loaded and your conda environment is setup,
+#       but before you switch to `run_dir`.
+    ''')
 
 # generate jobs across parameter grid
 run_script, job_paths = batch.generate([
@@ -28,6 +34,14 @@ run_script, job_paths = batch.generate([
     ('lr', [1e-4, 1e-3]),
 ], receptive_field=6)
 
+# NOTE:
+#       extra keywords (e.g. receptive_field) are also passed as arguments
+#       to the scripts. They have constant values across all scripts.
+
+#       the values in the parameter grid are used to generate `job_id`, but
+#       the constant arguments are not included in the job name.
+
+# ******************************
 # ** everything was generated ** - now let's see the outputted paths.
 
 slurmjobs.util.summary(run_script, job_paths)
@@ -40,18 +54,18 @@ print('An example command:\n\t',
 Outputs:
 ```
 Generated 12 job scripts:
-	 sbatch/train/train,kernel_size-2,lr-0.0001,nb_stacks-1.sbatch
-	 sbatch/train/train,kernel_size-2,lr-0.001,nb_stacks-1.sbatch
-	 sbatch/train/train,kernel_size-2,lr-0.0001,nb_stacks-2.sbatch
-	 sbatch/train/train,kernel_size-2,lr-0.001,nb_stacks-2.sbatch
-	 sbatch/train/train,kernel_size-3,lr-0.0001,nb_stacks-1.sbatch
-	 sbatch/train/train,kernel_size-3,lr-0.001,nb_stacks-1.sbatch
-	 sbatch/train/train,kernel_size-3,lr-0.0001,nb_stacks-2.sbatch
-	 sbatch/train/train,kernel_size-3,lr-0.001,nb_stacks-2.sbatch
-	 sbatch/train/train,kernel_size-5,lr-0.0001,nb_stacks-1.sbatch
-	 sbatch/train/train,kernel_size-5,lr-0.001,nb_stacks-1.sbatch
-	 sbatch/train/train,kernel_size-5,lr-0.0001,nb_stacks-2.sbatch
-	 sbatch/train/train,kernel_size-5,lr-0.001,nb_stacks-2.sbatch
+     sbatch/train/train,kernel_size-2,lr-0.0001,nb_stacks-1.sbatch
+     sbatch/train/train,kernel_size-2,lr-0.001,nb_stacks-1.sbatch
+     sbatch/train/train,kernel_size-2,lr-0.0001,nb_stacks-2.sbatch
+     sbatch/train/train,kernel_size-2,lr-0.001,nb_stacks-2.sbatch
+     sbatch/train/train,kernel_size-3,lr-0.0001,nb_stacks-1.sbatch
+     sbatch/train/train,kernel_size-3,lr-0.001,nb_stacks-1.sbatch
+     sbatch/train/train,kernel_size-3,lr-0.0001,nb_stacks-2.sbatch
+     sbatch/train/train,kernel_size-3,lr-0.001,nb_stacks-2.sbatch
+     sbatch/train/train,kernel_size-5,lr-0.0001,nb_stacks-1.sbatch
+     sbatch/train/train,kernel_size-5,lr-0.001,nb_stacks-1.sbatch
+     sbatch/train/train,kernel_size-5,lr-0.0001,nb_stacks-2.sbatch
+     sbatch/train/train,kernel_size-5,lr-0.001,nb_stacks-2.sbatch
 
 To submit all jobs, run:
 . sbatch/train/run_train.sh
@@ -59,6 +73,78 @@ To submit all jobs, run:
 An example command:
    python train.py --kernel-size=2 --nb_stacks=1
 ```
+
+### Parameter Grids
+
+Parameter grids are how you can define specific parameter combinations that you want to search over. It is very similar to `sklearn.model_selection.GridSearchCV`.
+
+```python
+params = [
+    # basic variable type
+    ('something', [1, 2]),
+    # variable with list type is ok too
+    ('nodes', [ [1, 2, 3], [4, 5, 6], [7, 8, 9] ]),
+    # these are co-occurring variables -  so we do:
+    #   (--a 1 --b 3) &  (--a 2 --b 5) but not:
+    #   (--a 2 --b 3) or (--a 1 --b 5)
+    (('a', 'b'), [ (1, 3), (2, 5) ]),
+    # single variables expand fine too.
+    ('some_flag', (True,))
+]
+
+assert list(slurmjobs.util.expand_grid(params)) == [
+    {'something': 1, 'nodes': [1, 2, 3], 'a': 1, 'b': 3, 'some_flag': True},
+    {'something': 1, 'nodes': [1, 2, 3], 'a': 2, 'b': 5, 'some_flag': True},
+
+    {'something': 1, 'nodes': [4, 5, 6], 'a': 1, 'b': 3, 'some_flag': True},
+    {'something': 1, 'nodes': [4, 5, 6], 'a': 2, 'b': 5, 'some_flag': True},
+
+    {'something': 1, 'nodes': [7, 8, 9], 'a': 1, 'b': 3, 'some_flag': True},
+    {'something': 1, 'nodes': [7, 8, 9], 'a': 2, 'b': 5, 'some_flag': True},
+
+    {'something': 2, 'nodes': [1, 2, 3], 'a': 1, 'b': 3, 'some_flag': True},
+    {'something': 2, 'nodes': [1, 2, 3], 'a': 2, 'b': 5, 'some_flag': True},
+
+    {'something': 2, 'nodes': [4, 5, 6], 'a': 1, 'b': 3, 'some_flag': True},
+    {'something': 2, 'nodes': [4, 5, 6], 'a': 2, 'b': 5, 'some_flag': True},
+
+    {'something': 2, 'nodes': [7, 8, 9], 'a': 1, 'b': 3, 'some_flag': True},
+    {'something': 2, 'nodes': [7, 8, 9], 'a': 2, 'b': 5, 'some_flag': True},
+]
+```
+
+### Multi-line Commands
+Initially, I had written this with a narrow scope of generating jobs for argument grid searches on a single script. But a coworker started asking how to handle jobs with multiple sequential commands so I spoke with her and managed to find a solution that can handle both cases.
+
+For single script commands (like above), you don't need to add any format keys (like before). If `multicmd` is False, it will automatically append `'{__all__}'` to the end of the command which will insert all of the specified arguments to the end of the string.
+
+For situations where you want to pass arguments to multiple commands, it's not always so trivial, especially when you need to designate which arguments go to which commands.
+
+To address this, you can use python format strings to specify particular arguments.
+
+To pass everything to a script (including the added `job_id` argument), you can use `{__all__}` as a key.
+
+```python
+import slurmjobs
+
+batch = slurmjobs.SlurmBatch('''
+python move_files.py {dates} {sensors}
+python convert_to_hdf5.py {dates} {sensors}
+python calculate_stats.py  # it's fine to not have arguments.
+python get_embeddings.py {dates} {sensors} {job_id}
+
+python predict.py {__all__}
+# (or equivalently)
+# python predict.py {dates} {sensors} {tax_path} {job_id}
+''', multicmd=True)
+
+# generate jobs across parameter grid
+run_script, job_paths = batch.generate([
+    ('sensors', [1, 2, 3, 5]),
+    ('dates', [1, 2])),
+], tax_path='path/to/taxonomy.json')
+```
+
 
 ### More:
  - [Customizing Behavior](docs/CUSTOMIZING.md) - in case you have different requirements.

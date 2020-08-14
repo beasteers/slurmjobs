@@ -19,10 +19,11 @@ class BaseBatch:
     DEFAULT_RUN_TEMPLATE = None
 
     def __init__(self, cmd, name=None, root_dir='jobs', paths=None,
-                 cli=None, backup=True, job_id=True, **kw):
+                 cli=None, backup=True, job_id=True, multicmd=True, **kw):
         # name
         self.cmd = cmd
         self.name = name or util.command_to_name(cmd)
+        self.multicmd = multicmd
 
         # paths
         self.paths = paths or self.get_paths(self.name, root_dir)
@@ -39,13 +40,14 @@ class BaseBatch:
         self.cli_fmt = cli
 
     def make_args(self, *a, **kw):
-        return Argument.get(self.cli_fmt).build(*a, **kw) or ''
+        return Argument.get(self.cli_fmt).build('{__all__}', *a, **kw)
 
     def make_command(self, *a, **kw):
-        return '{} {}'.format(self.cmd, self.make_args(*a, **kw))
+        cmd = self.cmd if self.multicmd else '{} {{__all__}}'.format(self.cmd)
+        return Argument.get(self.cli_fmt).build(cmd, *a, **kw)
 
     def generate(self, params=None, verbose=False, job_tpl=None, run_tpl=None,
-                 ignore=IGNORE, kwargs=None, **kw):
+                 kwargs=None, **kw):
         '''Generate slurm jobs for every combination of parameters.'''
         kw = dict(kw, **(kwargs or {})) # for taken keys.
         # generate jobs
@@ -54,7 +56,7 @@ class BaseBatch:
                 util.get_job_name(self.name, pms),
                 verbose=verbose, tpl=job_tpl, **kw, **pms)
             for pms in (
-                util.expand_param_grid(params, ignore=ignore)
+                util.expand_grid(params)
                 if params is not None else [{}])
         ]
 
@@ -97,7 +99,7 @@ class BaseBatch:
             if 'output' in paths.paths:
                 print('Output File:', paths.output)
             print()
-        return paths.job
+        return paths.job.format()
 
 
     def generate_run_script(self, job_paths, tpl=None, verbose=False, **kw):

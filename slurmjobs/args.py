@@ -6,7 +6,18 @@ Argument Formatters
 from . import util
 
 
-class NoArgVal: pass
+class ArgGroup:
+    def __init__(self, *a, **kw):
+        self.args = a
+        self.kwargs = kw
+
+
+NoArgVal = object()
+
+
+def flat_join(xs):
+    return ' '.join(str(x) for x in util.flatten(xs) if x)
+
 
 class Argument(util.Factory):
     prefix = suffix = ''
@@ -19,13 +30,32 @@ class Argument(util.Factory):
             key or cls.default_cls).lower())
 
     @classmethod
-    def build(cls, *args, **kw):
-        arglist = util.flatten(
-            [cls.prefix] +
-            [cls.format_arg(v) for v in args] +
-            [cls.format_arg(k, v) for k, v in kw.items()] +
-            [cls.suffix])
-        return ' '.join(str(a) for a in arglist if a)
+    def _format_args(cls, *args, **kw):
+        args = [cls.format_arg_or_group(v) for v in args]
+        kw = {k: cls.format_arg_or_group(k, v) for k, v in kw.items()}
+        return args, kw
+
+    @classmethod
+    def build(cls, cmd, *a, **kw):
+        a, kw = cls._format_args(*a, **kw)
+        all_ = flat_join([cls.prefix] + a + list(kw.values()) + [cls.suffix])
+        return cmd.format(*a, **kw, __all__=all_)
+
+    @classmethod
+    def build_args(cls, *a, **kw):
+        return cls.build('{__all__}', *a, **kw)
+
+    @classmethod
+    def format_arg_or_group(cls, k, v=NoArgVal):
+        possible_group = k if v is NoArgVal else v
+        if isinstance(possible_group, ArgGroup):
+            return cls.format_group(possible_group)
+        return cls.format_arg(k, v)
+
+    @classmethod
+    def format_group(cls, v):
+        args, kw = cls._format_args(*v.args, **v.kwargs)
+        return flat_join(args + list(kw.values()))
 
     @classmethod
     def format_arg(cls, k, v=NoArgVal):
@@ -52,9 +82,9 @@ class ArgparseArgument(Argument):
     short_opt, long_opt = '-', '--'
 
     @classmethod
-    def format_arg(cls, k, v=True):
+    def format_arg(cls, k, v=NoArgVal):
         key = cls.format_key(k)
-        if v is True:
+        if v is True or v is NoArgVal:
             return key
         if v is False or v is None:
             return ''
