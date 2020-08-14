@@ -3,16 +3,21 @@
 Argument Formatters
 
 '''
+from collections import namedtuple
 from . import util
 
 
-class ArgGroup:
-    def __init__(self, *a, **kw):
-        self.args = a
-        self.kwargs = kw
+NoArgVal = '((((SLURMJOBS: NO ARG VALUE))))'
 
 
-NoArgVal = object()
+class Arg(namedtuple('Arg', 'key value format')):
+    def __new__(self, key, value=NoArgVal, format=True):
+        return super().__new__(self, key, value, format)
+
+
+class ArgGroup(namedtuple('Arg', 'args kwargs')):
+    def __new__(self, *a, **kw):
+        return super().__new__(self, a, kw)
 
 
 def flat_join(xs):
@@ -47,9 +52,13 @@ class Argument(util.Factory):
 
     @classmethod
     def format_arg_or_group(cls, k, v=NoArgVal):
-        possible_group = k if v is NoArgVal else v
-        if isinstance(possible_group, ArgGroup):
-            return cls.format_group(possible_group)
+        value = k if v is NoArgVal else v
+        if isinstance(value, ArgGroup):
+            return cls.format_group(value)
+        if isinstance(value, Arg):
+            if not value.format:
+                return value.key if value.value is NoArgVal else value.value
+            k, v = value.key, value.value
         return cls.format_arg(k, v)
 
     @classmethod

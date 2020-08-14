@@ -49,7 +49,7 @@
 {% block cmd -%}
 {{ init_script }}
 ##### Run Command
-cd {{ run_dir }}
+cd {{ (run_dir|default('')) or '.' }}
 # run script with arguments
 {{ command }}
 {% endblock %}
