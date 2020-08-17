@@ -200,7 +200,8 @@ def all_subclasses(cls):
         s for c in cls.__subclasses__() for s in all_subclasses(c))
 
 def shlex_repr(v):
-    v = repr(v)
+    # v = repr(v)
+    v = json.dumps(v)
     # if v is a quoted string, remove the quotes
     if len(v) >= 2 and v[0] == v[-1] and v[0] in '"\'':
         v = v[1:-1]

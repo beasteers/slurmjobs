@@ -105,6 +105,13 @@ def test_arg_format():
     assert cmd == CMD + " with hi 'hi hey' arg1='[1, 2]' a=asdf b='asdf adf'"
 
 
+    # test
+    cmd = Args.get('fire').build(
+        CMD_, arg1=['a', 'b'], arg2={'a': 5, 'b': 6, 'c': [1, 'b']})
+    print('fire', cmd)
+    assert cmd == CMD + ' --arg1=\'["a", "b"]\' --arg2=\'{"a": 5, "b": 6, "c": [1, "b"]}\''
+
+
 def test_multicmd_arg_format():
     Args = slurmjobs.args.Argument
 

@@ -1,7 +1,7 @@
 import time
 import jinja2
 from . import util
-from .args import Argument
+from .args import Argument, DEFAULT_CLI
 
 env = jinja2.Environment(
     loader=jinja2.PackageLoader('slurmjobs', 'templates'))
@@ -17,9 +17,10 @@ class BaseBatch:
     JOB_ID_KEY = 'job_id'
     DEFAULT_JOB_TEMPLATE = None
     DEFAULT_RUN_TEMPLATE = None
+    DEFAULT_CLI = DEFAULT_CLI
 
     def __init__(self, cmd, name=None, root_dir='jobs', paths=None,
-                 cli=None, backup=True, job_id=True, multicmd=True, **kw):
+                 cli=None, backup=True, job_id=True, multicmd=False, **kw):
         # name
         self.cmd = cmd
         self.name = name or util.command_to_name(cmd)
@@ -37,7 +38,7 @@ class BaseBatch:
         if job_id is not True:
             self.JOB_ID_KEY = job_id or None
         self.job_args = dict(self.default_options, **kw)
-        self.cli_fmt = cli
+        self.cli_fmt = self.DEFAULT_CLI if cli is None else cli
 
     def make_args(self, *a, **kw):
         return Argument.get(self.cli_fmt).build('{__all__}', *a, **kw)

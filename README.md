@@ -116,11 +116,19 @@ assert list(slurmjobs.util.expand_grid(params)) == [
 ### Multi-line Commands
 Initially, I had written this with a narrow scope of generating jobs for argument grid searches on a single script. But a coworker started asking how to handle jobs with multiple sequential commands so I spoke with her and managed to find a solution that can handle both cases.
 
-For single script commands (like above), you don't need to add any format keys (like before). If `multicmd` is False, it will automatically append `'{__all__}'` to the end of the command which will insert all of the specified arguments to the end of the string.
+For single script commands (like above), you don't need to add any format keys (like before). If `multicmd=False` (the default), it will automatically append `'{__all__}'` to the end of the command which will insert all of the specified arguments to the end of the string.
 
 For situations where you want to pass arguments to multiple commands, it's not always so trivial, especially when you need to designate which arguments go to which commands.
 
-To address this, you can use python format strings to specify particular arguments.
+To address this, you can use python format strings (`'mycommand {arg1} {arg2}' => --arg1 4 --arg2 5`) to specify particular arguments. This will insert the entire command line flag so doing (`'{year}' => --year 2017`).
+
+I prefer this because it decouples your job generation from your argument format, but it does add some trouble when you're trying to do more complicated things (insert variables into other variables for example). To access the original variable without any added flag, you can just preceed the name with an underscore (e.g. to access `year`, do `{_year} => `2017`)
+
+**But**, after experimenting with this on a project, it can easily get complicated, especially if your scripts have inconsistent naming (`audio_output_dir` then `audio_output_folder`, etc.)
+
+So I'm happy to keep this functionality, but you probably want to consider just making a wrapper script that will run your multiple steps from a single command. It will probably also reduce the degrees of freedom you have to handle between script arguments.
+
+I use `fire` for creating my command line interfaces and it definitely decreases the amount of duplication from having to write argparse parsers.
 
 To pass everything to a script (including the added `job_id` argument), you can use `{__all__}` as a key.
 

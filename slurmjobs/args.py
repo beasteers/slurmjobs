@@ -7,6 +7,9 @@ from collections import namedtuple
 from . import util
 
 
+DEFAULT_CLI = 'fire'
+
+
 NoArgVal = '((((SLURMJOBS: NO ARG VALUE))))'
 
 
@@ -26,13 +29,11 @@ def flat_join(xs):
 
 class Argument(util.Factory):
     prefix = suffix = ''
-    default_cls = 'fire'
 
     @classmethod
-    def get(cls, key=None):
+    def get(cls, key='fire'):
         # key=fire -> FireArgument, key=None -> Argument
-        return cls.__children__(suffix='argument').get((
-            key or cls.default_cls).lower())
+        return cls.__children__(suffix='argument').get(key.lower()) if key else cls
 
     @classmethod
     def _format_args(cls, *args, **kw):
@@ -42,9 +43,10 @@ class Argument(util.Factory):
 
     @classmethod
     def build(cls, cmd, *a, **kw):
-        a, kw = cls._format_args(*a, **kw)
-        all_ = flat_join([cls.prefix] + a + list(kw.values()) + [cls.suffix])
-        return cmd.format(*a, **kw, __all__=all_)
+        a2, kw2 = cls._format_args(*a, **kw)
+        values = {f'_{k}': v for k, v in dict(enumerate(a), **kw).items()}
+        all_ = flat_join([cls.prefix] + a2 + list(kw2.values()) + [cls.suffix])
+        return cmd.format(*a2, **kw2, __all__=all_, **values)
 
     @classmethod
     def build_args(cls, *a, **kw):
@@ -68,7 +70,7 @@ class Argument(util.Factory):
 
     @classmethod
     def format_arg(cls, k, v=NoArgVal):
-        raise NotImplementedError
+        return cls.format_value(k) if v is NoArgVal else cls.format_value(v)
 
     @classmethod
     def format_value(cls, v):
