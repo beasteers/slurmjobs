@@ -117,6 +117,10 @@ def unpack(params):
         else:
             yield n, v
 
+
+def as_chunks(lst, n=1):
+    return [lst[i:i + n] for i in range(0, len(lst), n)]
+
 '''
 
 Misc / template utils

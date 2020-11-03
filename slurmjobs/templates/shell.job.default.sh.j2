@@ -9,7 +9,6 @@
 
 
 {% block body -%}
-{{ init_script }}
 
 {% block environment -%}
 ##### Setup Environment
@@ -25,12 +24,14 @@
 
 {% block cmd -%}
 ##### Run Command
+{{ init_script }}
 
 cd {{ run_dir }}
 # run script with arguments
 nohup {{ command }} \
     > {{ paths.output }} 2>&1 </dev/null &
 
+{{ post_script }}
 {%- endblock %}
 
 

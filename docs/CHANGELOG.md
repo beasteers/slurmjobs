@@ -1,5 +1,11 @@
 # Changes
 
+## v0.1.2
+ - Added a receipt utility to avoid re-running functions `slurmjobs.use_receipt(func)(*a, **kw)`
+ - Added `Batch().generate(expand_grid=False)` option to avoid expanding parameters and passing explicit grids
+ - fixed json encoding error in run templates
+ - 
+
 ## v0.1.1
  - commands can now access the original values (without command line flag attached) by using the variable name preceded with an underscore. e.g.
     - `'{year}' -> '--year 2016'`

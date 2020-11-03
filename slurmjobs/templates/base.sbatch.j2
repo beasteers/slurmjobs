@@ -1,0 +1,51 @@
+#!/bin/bash
+{% block arguments -%}
+#SBATCH --job-name={{ job_name }}
+#SBATCH --nodes={{ nodes|default(1) }}
+#SBATCH --cpus-per-task={{ n_cpus|default(n_gpus or 1) }}
+#SBATCH --gres=gpu:{{ n_gpus }}
+{% if email -%}
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user={{ email }}
+{%- endif %}
+#SBATCH --output={{ paths.output }}
+{% for key, val in sbatch_options.items() -%}
+    #SBATCH --{{ key|replace('_', '-') }}={{ val }}
+{% endfor %}
+{% endblock -%}
+
+
+{% block body -%}
+
+. ~/.bashrc
+
+{% block modules -%}
+##### Load Modules
+{% if modules -%}
+    module purge
+    {% for module in modules -%}
+        module load {{ module }}
+    {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block environment -%}
+##### Setup Environment
+{% if conda_env -%}
+    module load anaconda3/{{ conda_version }}
+    # activate conda environment
+    . deactivate
+    source activate {{ conda_env }}
+{% endif %}
+{% endblock %}
+
+{% block cmd -%}
+{{ init_script }}
+##### Run Command
+cd {{ (run_dir|default('')) or '.' }}
+# run script with arguments
+{{ command }}
+{{ post_script }}
+{% endblock %}
+
+{% endblock %}

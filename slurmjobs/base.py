@@ -1,4 +1,5 @@
 import time
+import pprint
 import jinja2
 from . import util
 from .args import Argument, DEFAULT_CLI
@@ -7,6 +8,7 @@ env = jinja2.Environment(
     loader=jinja2.PackageLoader('slurmjobs', 'templates'))
 env.filters['prettyjson'] = util.prettyjson
 env.filters['prefixlines'] = util.prefixlines
+env.filters['pprint'] = pprint.pformat
 env.filters['comment'] = lambda x, ns=1, ch='#', nc=1: util.prefixlines(x, ch*nc+' '*ns)
 
 IGNORE = object()
@@ -18,9 +20,13 @@ class BaseBatch:
     DEFAULT_JOB_TEMPLATE = None
     DEFAULT_RUN_TEMPLATE = None
     DEFAULT_CLI = DEFAULT_CLI
+    INIT_SCRIPT = ''
+    RUN_INIT_SCRIPT = ''
+    POST_SCRIPT = ''
 
     def __init__(self, cmd, name=None, root_dir='jobs', paths=None,
-                 cli=None, backup=True, job_id=True, multicmd=False, **kw):
+                 cli=None, backup=True, job_id=True, multicmd=False,
+                 init_script=None, run_init_script=None, post_script=None, **kw):
         # name
         self.cmd = cmd
         self.name = name or util.command_to_name(cmd)
@@ -35,9 +41,18 @@ class BaseBatch:
                 self.paths.batch_dir.rmglob(include=True)
 
         # job arguments
+        init_script = '\n\n'.join((self.INIT_SCRIPT or '', init_script or ''))
+        run_init_script = '\n\n'.join((self.RUN_INIT_SCRIPT or '', run_init_script or ''))
+        post_script = '\n\n'.join((self.POST_SCRIPT or '', post_script or ''))
+
         if job_id is not True:
             self.JOB_ID_KEY = job_id or None
-        self.job_args = dict(self.default_options, **kw)
+
+        self.job_args = dict(
+            self.default_options,
+            init_script=init_script,
+            post_script=post_script,
+            run_init_script=run_init_script, **kw)
         self.cli_fmt = self.DEFAULT_CLI if cli is None else cli
 
     def make_args(self, *a, **kw):
@@ -47,23 +62,23 @@ class BaseBatch:
         cmd = self.cmd if self.multicmd else '{} {{__all__}}'.format(self.cmd)
         return Argument.get(self.cli_fmt).build(cmd, *a, **kw)
 
-    def generate(self, params=None, verbose=False, job_tpl=None, run_tpl=None,
-                 kwargs=None, summary=False, **kw):
+    def generate(self, grid=None, *posargs, verbose=False, job_tpl=None, run_tpl=None,
+                 kwargs=None, summary=False, expand_grid=True, **kw):
         '''Generate slurm jobs for every combination of parameters.'''
         kw = dict(kw, **(kwargs or {})) # for taken keys.
         # generate jobs
         job_paths = [
             self.generate_job(
-                util.get_job_name(self.name, pms),
+                util.get_job_name(self.name, pms), *posargs,
                 verbose=verbose, tpl=job_tpl, **kw, **pms)
             for pms in (
-                util.expand_grid(params)
-                if params is not None else [{}])
+                (util.expand_grid(grid) if expand_grid else grid)
+                if grid is not None else [{}])
         ]
 
         # generate run file
         run_script = self.generate_run_script(
-            job_paths, params=dict(params, **kw) if params else kw,
+            job_paths, params=dict(grid, **kw) if grid else kw,
             tpl=run_tpl, verbose=verbose)
 
         # store the current timestamp

@@ -3,12 +3,14 @@
 #
 # Job Batch: {{ name }}
 # Params:
-{{ params|prettyjson|comment }}
+{{ params|pprint|comment }}
 #
 #########################
 {% endblock %}
 
 {% block body %}
+{{ run_init_script }}
+
 {% for path in job_paths -%}
 sbatch "{{ path }}"
 {% endfor %}

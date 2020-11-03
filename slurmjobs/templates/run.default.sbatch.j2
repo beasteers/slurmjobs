@@ -3,7 +3,7 @@
 #
 # Job Batch: {{ name }}
 # Params:
-{{ params|prettyjson|prefixlines('# ') }}
+{{ params|pprint|prefixlines('# ') }}
 #
 #########################
 {% endblock %}
