@@ -1,5 +1,11 @@
 # Changes
 
+## v0.1.7
+ - added JSON metadata that can be stored in the receipt. Currently, adds `duration_secs` and `time`
+ - added more receipt logging (on successful write, on skip, on error)
+ - Set `slurmjobs.Receipt.TEST` instead of `slurmjobs.use_receipt.TEST`
+
+
 ## v0.1.2
  - Added a receipt utility to avoid re-running functions `slurmjobs.use_receipt(func)(*a, **kw)`
  - Added `Batch().generate(expand_grid=False)` option to avoid expanding parameters and passing explicit grids

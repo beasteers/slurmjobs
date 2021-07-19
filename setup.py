@@ -1,7 +1,8 @@
+import glob
 import setuptools
 
 setuptools.setup(name='slurmjobs',
-                 version='0.1.2',
+                 version='0.1.8',
                  description='Generate slurm jobs in batches.',
                  long_description=open('README.md').read().strip(),
                  long_description_content_type='text/markdown',
@@ -9,6 +10,7 @@ setuptools.setup(name='slurmjobs',
                  author_email='bea.steers@gmail.com',
                  # url='http://path-to-my-packagename',
                  package_data={'slurmjobs': ['templates/*.j2']},
+                 scripts=glob.glob('scripts/*'),
                  packages=setuptools.find_packages(),
                  install_requires=['path-tree', 'Jinja2'],
                  license='MIT License',

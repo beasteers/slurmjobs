@@ -5,6 +5,8 @@ Generate a set of `.sbatch` files over a grid of parameters to be searched over.
 
 You can also use `ShellBatch` which excludes the slurm/module references so you can test & run on your local machine or test server.
 
+> NOTE: because NYU switched to Greene which now utilizes singularity, the previous workflow regarding loading modules is not as necessary. Therefore, I will likely be experimenting and changing how things are done to suit the new workflow. If you want to keep the old setup, pin to `<=0.1.2`. (Sorry I should have just did a `0.2` bump off the bat).
+
 ## Install
 
 ```bash
@@ -18,7 +20,7 @@ import slurmjobs
 
 batch = slurmjobs.SlurmBatch(
     'python train.py',
-    email='me@something.com',
+    email='me@nyu.edu',
     conda_env='my_env',
     init_script='''
 echo "hi! I'm running before the main command!"
@@ -164,6 +166,7 @@ Currently we support:
  - `fire`: (e.g. `python script.py some_func 5 10 --asdf=[1,2,3] --zxcv={a:5,b:7}`)
  - `argparse`: (e.g. `python script.py some_action -a -b --asdf 1 2 3`)
  - `sacred`: (e.g. `python script.py with some_cfg asdf=[1,2,3] a=True`)
+ - `hydra`: (e.g. `python script.py +train.path='../data' +asdf={a:5,b:7}`)
  - any thing else? lmk! and look at `slurmjobs.args.Argument` and subclasses for
    examples on how to subclass your own formatter.
 
@@ -200,3 +203,4 @@ I designed this to be as customizable and extensible as possible, so I hope it's
     - stop(): `for l in open('run_ids.sh'): os.system('scancel {}'.format(l))`
     - stop_user(): `os.system('scancel -u')`
     - list jobs, get status/durations
+  - any singularity helpers? idk

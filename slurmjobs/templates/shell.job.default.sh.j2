@@ -15,8 +15,8 @@
 
 {% if conda_env -%}
     # activate conda environment
-    . deactivate
-    source activate {{ conda_env }}
+    conda deactivate
+    conda activate {{ conda_env }}
 {% endif %}
 
 {%- endblock %}

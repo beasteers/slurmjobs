@@ -24,6 +24,31 @@ Naming Transformers
 
 '''
 
+_REPLACED = {
+    '.': 'pt', ',': 'cm', '@': 'at', '/': 'sl', '\\': 'bs',
+    ':': 'col', ';': 'sem', '<': 'lt', '>': 'gt',
+    '!': 'ex', '?': 'qsn', '~': 'tld', '`': 'bkt',
+    '#': 'hsh', '$': 'dol', '%': 'pct', '^': 'crt',
+    '&': 'and', '+': 'pls', '=': 'eq', '-': 'dsh', '|': 'ppe',
+    '[': 'sq_o', ']': 'sq_c', '(': 'pr_o', ')': 'pr_c',
+    '{': 'crl_o', '}': 'crl_c',
+}
+
+_REPLACED = {k: '__{}__'.format(v.upper()) for k, v in _REPLACED.items()}
+
+def _encode_special(x):
+    for sp, token in _REPLACED.items():
+        x.replace(sp, token)
+    return x
+
+def _decode_special(x):
+    for sp, token in _REPLACED.items():
+        x.replace(token, sp)
+    return x
+
+def _obliterate_special(x):
+    return ''.join(xi if xi.isalnum() else _REPLACED.get(xi, '__') for xi in x)
+
 def command_to_name(command):
     fbase = os.path.splitext(shlex.split(command)[1])[0]
     return fbase.replace('/', '.').lstrip('.').replace(' ', '-')
@@ -34,13 +59,15 @@ def get_job_name(name, params, job_name_tpl=None, allowed=",._-"):
         params = {k: format_value_for_name(v) for k, v in params.items()}
         param_names, param_vals = list(zip(*sorted(params.items())))
         job_name_tpl = job_name_tpl or make_job_name_tpl(param_names)
-        name = name + ',' + job_name_tpl.format(*param_vals, **params)
+        name = name + ',' + job_name_tpl.format(*param_vals, **{
+            _obliterate_special(k): v for k, v in params.items()
+        })
     name = ''.join(x for x in name if (x.isalnum() or x in allowed))
     return name
 
 def make_job_name_tpl(names):
     # create a python format string for all parameters
-    return ','.join(f'{n}-{{{n}}}' for n in names)
+    return ','.join(f'{n}-{{{_obliterate_special(n)}}}' for n in names)
 
 def format_value_for_name(x):
     # Format parameter values so that they are filename safe

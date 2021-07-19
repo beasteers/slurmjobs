@@ -10,6 +10,7 @@ class ShellBatch(BaseBatch):
         conda_env=None,
         run_dir='.',
         init_script='',
+        bashrc=True,
     )
 
     DEFAULT_JOB_TEMPLATE = 'shell.job.default.sh.j2'
@@ -31,8 +32,15 @@ MODULE_PRESETS = {
     'cuda9': ['cudnn/9.0v7.3.0.29', 'cuda/9.0.176'],
     'cuda10': ['cuda/10.0.130', 'cudnn/10.0v7.4.2.24'],
     'cuda10.1': ['cuda/10.1.105', 'cudnn/10.1v7.6.5.32'],
+    'cuda10.2': ['cuda/10.2.89'],
+    'cuda11': ['cuda/11.0.194'],
+    'cuda11.1': ['cuda/11.1.74'],
+    'cuda11.3': ['cuda/11.3.1'],
+    'conda': ['anaconda3/2020.07'],
+    'anaconda': ['anaconda3/2020.07'],
+    'anaconda3': ['anaconda3/2020.07'],
 }
-
+# cuda           cuda/10.2.89   cuda/11.0.194  cuda/11.1.74   cuda/11.3.1
 
 class SlurmBatch(BaseBatch):
     '''
@@ -47,7 +55,6 @@ class SlurmBatch(BaseBatch):
         nodes=1,
         conda_env=None,
         run_dir='.',
-        conda_version='5.3.1',
         email=None,
         modules=[],
         sbatch_options=dict(

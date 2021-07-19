@@ -31,49 +31,48 @@ class Argument(util.Factory):
     prefix = suffix = ''
 
     @classmethod
-    def get(cls, key='fire'):
+    def get(cls, key='fire', *a, **kw):
         # key=fire -> FireArgument, key=None -> Argument
-        return cls.__children__(suffix='argument').get(key.lower()) if key else cls
+        if not key:
+            return cls
+        if isinstance(key, cls):
+            return key
+        if isinstance(key, type) and issubclass(key, cls):
+            return key(*a, **kw)
+        return cls.__children__(suffix='argument').get(key.lower())(*a, **kw)
 
-    @classmethod
-    def _format_args(cls, *args, **kw):
-        args = [cls.format_arg_or_group(v) for v in args]
-        kw = {k: cls.format_arg_or_group(k, v) for k, v in kw.items()}
+    def _format_args(self, *args, **kw):
+        args = [self.format_arg_or_group(v) for v in args]
+        kw = {k: self.format_arg_or_group(k, v) for k, v in kw.items()}
         return args, kw
 
-    @classmethod
-    def build(cls, cmd, *a, **kw):
-        a2, kw2 = cls._format_args(*a, **kw)
+    def build(self, cmd, *a, **kw):
+        a2, kw2 = self._format_args(*a, **kw)
         values = {f'_{k}': v for k, v in dict(enumerate(a), **kw).items()}
-        all_ = flat_join([cls.prefix] + a2 + list(kw2.values()) + [cls.suffix])
+        all_ = flat_join([self.prefix] + a2 + list(kw2.values()) + [self.suffix])
         return cmd.format(*a2, **kw2, __all__=all_, **values)
 
-    @classmethod
-    def build_args(cls, *a, **kw):
-        return cls.build('{__all__}', *a, **kw)
+    def build_args(self, *a, **kw):
+        return self.build('{__all__}', *a, **kw)
 
-    @classmethod
-    def format_arg_or_group(cls, k, v=NoArgVal):
+    def format_arg_or_group(self, k, v=NoArgVal):
         value = k if v is NoArgVal else v
         if isinstance(value, ArgGroup):
-            return cls.format_group(value)
+            return self.format_group(value)
         if isinstance(value, Arg):
             if not value.format:
                 return value.key if value.value is NoArgVal else value.value
             k, v = value.key, value.value
-        return cls.format_arg(k, v)
+        return self.format_arg(k, v)
 
-    @classmethod
-    def format_group(cls, v):
-        args, kw = cls._format_args(*v.args, **v.kwargs)
+    def format_group(self, v):
+        args, kw = self._format_args(*v.args, **v.kwargs)
         return flat_join(args + list(kw.values()))
 
-    @classmethod
-    def format_arg(cls, k, v=NoArgVal):
-        return cls.format_value(k) if v is NoArgVal else cls.format_value(v)
+    def format_arg(self, k, v=NoArgVal):
+        return self.format_value(k) if v is NoArgVal else self.format_value(v)
 
-    @classmethod
-    def format_value(cls, v):
+    def format_value(self, v):
         return util.shlex_repr(v)
 
 
@@ -81,39 +80,53 @@ class Argument(util.Factory):
 class FireArgument(Argument):
     kw_fmt = '--{key}={value}'
 
-    @classmethod
-    def format_arg(cls, k, v=NoArgVal):
+    def format_arg(self, k, v=NoArgVal):
         if v is NoArgVal:
-            return cls.format_value(k)
-        return cls.kw_fmt.format(key=k, value=cls.format_value(v))
+            return self.format_value(k)
+        return self.kw_fmt.format(key=k, value=self.format_value(v))
 
 
 
 class ArgparseArgument(Argument):
     short_opt, long_opt = '-', '--'
 
-    @classmethod
-    def format_arg(cls, k, v=NoArgVal):
-        key = cls.format_key(k)
+    def format_arg(self, k, v=NoArgVal):
+        key = self.format_key(k)
         if v is True or v is NoArgVal:
             return key
         if v is False or v is None:
             return ''
         if not isinstance(v, (list, tuple, set)):
             v = [v]
-        return [key] + [cls.format_value(x) for x in v]
+        return [key] + [self.format_value(x) for x in v]
 
-    @classmethod
-    def format_key(cls, k):
-        return '{}{}'.format(cls.long_opt if len(k) > 1 else cls.short_opt, k)
+    def format_key(self, k):
+        return '{}{}'.format(self.long_opt if len(k) > 1 else self.short_opt, k)
 
 
 class SacredArgument(FireArgument):
     prefix = 'with'
     kw_fmt = '{key}={value}'
 
-    @classmethod
-    def format_arg(cls, k, v=NoArgVal):
+
+class HydraArgument(FireArgument):
+    kw_fmt = '{key}={value}'
+    available_prefixes = ['+', '++', '~', '']
+    # https://hydra.cc/docs/advanced/override_grammar/basic
+
+    def __init__(self, default_prefix='+', **kw):
+        default_prefix = default_prefix or ''
+        if default_prefix not in self.available_prefixes:
+            raise ValueError('invalid hydra prefix: {}. Must be one of {}'.format(
+                default_prefix, self.available_prefixes))
+        self.kw_fmt_prefixed = default_prefix + self.kw_fmt
+        super().__init__(**kw)
+
+    def format_arg(self, k, v=NoArgVal):
         if v is NoArgVal:
-            return cls.format_value(k)
-        return cls.kw_fmt.format(key=k, value=cls.format_value(v))
+            return self.format_value(k)
+        kw_fmt = (
+            self.kw_fmt
+            if any(k.startswith(pfx) for pfx in self.available_prefixes if pfx)
+            else self.kw_fmt_prefixed)
+        return kw_fmt.format(key=k, value=self.format_value(v))

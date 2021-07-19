@@ -24,7 +24,9 @@
 
 {% block body -%}
 
-. ~/.bashrc
+{% if bashrc -%}
+    . ~/.bashrc
+{% endif %}
 
 {% block modules -%}
 ##### Load Modules
@@ -39,10 +41,9 @@
 {% block environment -%}
 ##### Setup Environment
 {% if conda_env -%}
-    module load anaconda3/{{ conda_version }}
     # activate conda environment
-    . deactivate
-    source activate {{ conda_env }}
+    conda deactivate
+    conda activate {{ conda_env }}
 {% endif %}
 {% endblock %}
 
