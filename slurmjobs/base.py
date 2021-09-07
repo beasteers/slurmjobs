@@ -25,12 +25,13 @@ class BaseBatch:
     POST_SCRIPT = ''
 
     def __init__(self, cmd, name=None, root_dir='jobs', paths=None,
-                 cli=None, backup=True, job_id=True, multicmd=False,
+                 cli=None, backup=True, job_id=True, multicmd=False, cmd_wrapper=None,
                  init_script=None, run_init_script=None, post_script=None, **kw):
         # name
         self.cmd = cmd
         self.name = name or util.command_to_name(cmd)
         self.multicmd = multicmd
+        self.cmd_wrapper = cmd_wrapper
 
         # paths
         self.paths = paths or self.get_paths(self.name, root_dir)
@@ -60,25 +61,37 @@ class BaseBatch:
 
     def make_command(self, *a, **kw):
         cmd = self.cmd if self.multicmd else '{} {{__all__}}'.format(self.cmd)
-        return Argument.get(self.cli_fmt).build(cmd, *a, **kw)
+        cmd = Argument.get(self.cli_fmt).build(cmd, *a, **kw)
+        if self.cmd_wrapper:
+            cmd = self.cmd_wrapper.format(cmd)
+        return cmd
 
     def generate(self, grid=None, *posargs, verbose=False, job_tpl=None, run_tpl=None,
                  kwargs=None, summary=False, expand_grid=True, **kw):
         '''Generate slurm jobs for every combination of parameters.'''
         kw = dict(kw, **(kwargs or {})) # for taken keys.
+
+        # prepare parameter grid
+        if grid is None:
+            grid = [{}]
+        grid_literals = []
+        if isinstance(grid, (list, tuple)):
+            grid, grid_literals = util.split_cond(lambda x: isinstance(x, dict), grid, [False, True])
+        unexpanded_grid = grid
+        if expand_grid:
+            grid = util.expand_grid(grid)
+        grid.extend(grid_literals)
+
         # generate jobs
         job_paths = [
             self.generate_job(
                 util.get_job_name(self.name, pms), *posargs,
                 verbose=verbose, tpl=job_tpl, **kw, **pms)
-            for pms in (
-                (util.expand_grid(grid) if expand_grid else grid)
-                if grid is not None else [{}])
-        ]
+            for pms in grid]
 
         # generate run file
         run_script = self.generate_run_script(
-            job_paths, params=dict(grid, **kw) if grid else kw,
+            job_paths, params=dict(unexpanded_grid, **kw) if unexpanded_grid else kw,
             tpl=run_tpl, verbose=verbose)
 
         # store the current timestamp

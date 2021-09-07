@@ -1,5 +1,15 @@
 # Changes
 
+## 0.2.1
+ - Now you can pass in a list of dicts and it will use each dictionary as a job. This works along side the parameter grid expansion so you can do:
+   ```python
+   jobs.generate([{'param1': 5}, ('param1', [100, 150]), ('param2', [200, 250])])
+   ```
+ - Added `cmd_wrapper` argument to `SlurmBatch('python myscript.py', cmd_wrapper=slurmjobs.util.singularity_command(overlay, sif))` for easier command formatting (no longer need to use `multicmd=True` and `{__all__}`). It expects a string with one positional format arg, e.g. ('sudo {}')
+
+## 0.2.0
+Oops - TODO - fill in. This was changes to adapt to NYU Greene and Singularity containers.
+
 ## v0.1.7
  - added JSON metadata that can be stored in the receipt. Currently, adds `duration_secs` and `time`
  - added more receipt logging (on successful write, on skip, on error)

@@ -105,11 +105,16 @@ def expand_grid(params, ignore=NOTHING):
     return list(_iter_expand_grid(params))
 
 def _iter_expand_grid(params):
-    param_names, param_grid = zip(*(
-        params.items() if isinstance(params, dict) else params))
+    if isinstance(params, (list, tuple)):
+        params, param_literals = split_cond(lambda x: isinstance(x, dict), params, [False, True])
+        yield from param_literals
+    
+    param_names, param_grid = tuple(zip(*(
+        params.items() if isinstance(params, dict) else params))) or ([], [])
 
-    for ps in itertools.product(*param_grid):
-        yield expand_paired_params(zip(param_names, ps))
+    if param_grid:
+        for ps in itertools.product(*param_grid):
+            yield expand_paired_params(zip(param_names, ps))
 
 def expand_paired_params(params, ignore=NOTHING):
     '''Flatten tuple dict key/value pairs
@@ -147,6 +152,18 @@ def unpack(params):
 
 def as_chunks(lst, n=1):
     return [lst[i:i + n] for i in range(0, len(lst), n)]
+
+
+def split_cond(cond, lst, keys=None):
+    res = {k: [] for k in keys or []}
+    for x in lst:
+        k = cond(x)
+        if keys and k not in keys:
+            continue
+        if k not in res:
+            res[k] = []
+        res[k].append(x)
+    return [res[k] for k in keys or sorted(res)]
 
 '''
 
@@ -243,3 +260,7 @@ def stripstr(text, prefix='', suffix=''):
     text = text[len(prefix):] if prefix and text.startswith(prefix) else text
     text = text[:-len(suffix)] if suffix and text.endswith(suffix) else text
     return text
+
+
+def singularity_command(overlay, sif):
+    return 'singularity exec --nv --overlay {}:ro {}  bash -c ". /ext3/env.sh; {{}}"'.format(overlay, sif)
