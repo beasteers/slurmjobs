@@ -264,3 +264,29 @@ def stripstr(text, prefix='', suffix=''):
 
 def singularity_command(overlay, sif):
     return 'singularity exec --nv --overlay {}:ro {}  bash -c ". /ext3/env.sh; {{}}"'.format(overlay, sif)
+
+
+def get_available_tensorflow_cuda_versions():
+    # https://www.tensorflow.org/install/source#gpu
+    import csv
+    with open(os.path.join(os.path.dirname(__file__), 'cuda_versions.csv'), 'r') as f:
+        rows = list(csv.DictReader(f, delimiter='\t'))
+    return { d['Version'].split('-')[-1]: {
+        'cuda': d['CUDA'], 'cudnn': d['cuDNN'], 
+        'python': d["Python version"].split(', ')
+    } for d in rows }
+
+def find_tensorflow_cuda_version(version, latest=False):
+    import fnmatch
+    versions = get_available_tensorflow_cuda_versions()
+    version = str(version).split('.')[:2]
+    version = '.'.join(version + ['*']*(3 - len(version)))
+    matched = sorted([v for v in versions if fnmatch.fnmatch(v, version)])
+    if not matched:
+        raise ValueError('No value matching {!r}'.format(version))
+    matched = matched[-1 if latest else 0]
+    return dict(versions[matched], version=matched)
+
+if __name__ == '__main__':
+    import fire
+    fire.Fire()
