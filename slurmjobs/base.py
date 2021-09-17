@@ -63,7 +63,10 @@ class BaseBatch:
         cmd = self.cmd if self.multicmd else '{} {{__all__}}'.format(self.cmd)
         cmd = Argument.get(self.cli_fmt).build(cmd, *a, **kw)
         if self.cmd_wrapper:
-            cmd = self.cmd_wrapper.format(cmd)
+            if callable(self.cmd_wrapper):
+                cmd = self.cmd_wrapper(cmd)
+            else:
+                cmd = self.cmd_wrapper.format(cmd)
         return cmd
 
     def generate(self, grid=None, *posargs, verbose=False, job_tpl=None, run_tpl=None,

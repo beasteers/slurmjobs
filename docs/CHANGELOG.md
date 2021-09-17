@@ -1,5 +1,10 @@
 # Changes
 
+## 0.2.2
+ - `cmd_wrapper` can also be a function
+ - added `util.find_tensorflow_cuda_version` to lookup cuda versions
+ - `util.singularity_command` returns a function that will now escape quotes in the passed command
+
 ## 0.2.1
  - Now you can pass in a list of dicts and it will use each dictionary as a job. This works along side the parameter grid expansion so you can do:
    ```python
