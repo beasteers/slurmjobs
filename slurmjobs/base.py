@@ -70,6 +70,7 @@ class BaseBatch:
         return cmd
 
     def generate(self, grid=None, *posargs, verbose=False, job_tpl=None, run_tpl=None,
+                 job_name_tpl=None, job_name_allowed=",._-",
                  kwargs=None, summary=False, expand_grid=True, **kw):
         '''Generate slurm jobs for every combination of parameters.'''
         kw = dict(kw, **(kwargs or {})) # for taken keys.
@@ -88,8 +89,9 @@ class BaseBatch:
         # generate jobs
         job_paths = [
             self.generate_job(
-                util.get_job_name(self.name, pms), *posargs,
-                verbose=verbose, tpl=job_tpl, **kw, **pms)
+                util.get_job_name(self.name, pms, job_name_tpl=job_name_tpl,
+                                  allowed=job_name_allowed),
+                *posargs, verbose=verbose, tpl=job_tpl, **kw, **pms)
             for pms in grid]
 
         # generate run file
