@@ -1,7 +1,7 @@
 # slurmjobs
 
 [![pypi](https://badge.fury.io/py/slurmjobs.svg)](https://pypi.python.org/pypi/slurmjobs/)
-![tests](https://github.com/beasteers/slurmjobs/actions/workflows/ci.yml/badge.svg)
+![tests](https://github.com/beasteers/slurmjobs/actions/workflows/ci.yaml/badge.svg)
 [![docs](https://readthedocs.org/projects/slurmjobs/badge/?version=latest)](http://slurmjobs.readthedocs.io/?badge=latest)
 [![License](https://img.shields.io/pypi/l/slurmjobs.svg)](https://github.com/beasteers/slurmjobs/blob/main/LICENSE.md)
 
