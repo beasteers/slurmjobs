@@ -20,4 +20,8 @@ setuptools.setup(name='slurmjobs',
                  packages=setuptools.find_packages(),
                  install_requires=['path-tree', 'Jinja2'],
                  license=open('README.md').readline().strip(),
+                 extras_require={
+                    'test': ['pytest', 'pytest-cov'],
+                    'doc': ['sphinx']
+                },
                  keywords='slurm sbatch job batch generation parameters ml machine learning python')
