@@ -1,0 +1,40 @@
+{% extends "job.sbatch.j2" %}
+
+{% block modules %}{% endblock %}
+
+{% block body -%}
+
+{% block singularity_enter %}
+
+###### ( hop into the singularity o_O )
+{% if singularity_sif -%}
+singularity exec \
+    {%- if n_gpus %} 
+    --nv \{% endif %}
+    {%- if overlay %} 
+    --overlay {{ overlay }}{% if readonly %}:ro{% endif %} \{% endif %}
+    {%- if overlays %}{% for overlay in overlays %}
+    --overlay {{ overlay }} \{% endfor %}{% endif %}
+    {%- if readonly_overlays %}{% for overlay in readonly_overlays -%}
+    --overlay {{ overlay }}:ro \{% endfor %}{% endif %}
+    {{ singularity_sif }} \
+    /bin/bash << EOF
+echo "@: entered singularity container"
+{{ singularity_init_script }}
+{% endif %}
+{% endblock -%}
+
+{# Calls the normal script init stuff, just inside the singularity container. #}
+{{ super() }}
+
+
+
+{%- block singularity_exit %}
+{% if singularity_sif -%}
+###### (escape from the singularity @o@ )
+echo "@: exiting singularity container"
+exit 0;
+EOF
+{% endif %}
+{% endblock -%}
+{%- endblock -%}

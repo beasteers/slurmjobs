@@ -10,12 +10,11 @@ NOTE: Python Fire requires that class __init__ args use keyword notation (--cmd=
 
 Fire User Guide: https://github.com/google/python-fire/blob/master/docs/guide.md
 '''
-from slurmjobs import ShellBatch, SlurmBatch, PySlurmBatch
+from slurmjobs import *
 
 if __name__ == '__main__':
     import fire
     fire.Fire({
-        'sh': ShellBatch,
-        'slurm': SlurmBatch,
-        'pyslurm': PySlurmBatch,
+        'sh': Shell,
+        'slurm': Slurm,
     })

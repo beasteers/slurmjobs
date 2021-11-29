@@ -5,6 +5,7 @@ TODO:
 
 '''
 import os
+import itertools
 import slurmjobs
 import pathtree
 import pytest
@@ -18,7 +19,7 @@ def test_basic():
     EMAIL = 'bea.steers@gmail.com'
 
     # set batch parameters
-    batcher = slurmjobs.SlurmBatch(
+    batcher = slurmjobs.Slurm(
         COMMAND, email=EMAIL,
         root_dir=os.path.join(ROOT, 'slurm'),
         conda_env=CONDA_ENV,
@@ -26,7 +27,7 @@ def test_basic():
         backup=False)
     assert batcher.name == NAME
 
-    assert all(m in batcher.job_args['modules'] for m in slurmjobs.core.MODULE_PRESETS['cuda9'])
+    assert all(m in batcher.options['modules'] for m in batcher.module_presets['cuda9'])
 
     # generate scripts
     run_script, job_paths = batcher.generate([
@@ -41,6 +42,8 @@ def test_basic():
     found_job_paths = batcher.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
     job_content = pathtree.Path(job_paths[0]).read()
+    print(job_content)
+    print([x for x in (NAME, COMMAND, CONDA_ENV, EMAIL) if x not in job_content])
     assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV, EMAIL))
 
     # check run file
@@ -58,7 +61,7 @@ def test_shell():
     CONDA_ENV = 'dfakjsdfhajkh43981hrt4138r91gh4'
 
     # set batch parameters
-    batcher = slurmjobs.ShellBatch(
+    batcher = slurmjobs.Shell(
         COMMAND, root_dir=os.path.join(ROOT, 'shell'),
         conda_env=CONDA_ENV, backup=False)
     assert batcher.name == NAME
@@ -82,6 +85,37 @@ def test_shell():
     assert all(path in run_content for path in job_paths)
 
 
+def test_sing():
+    NAME = 'some.thing'
+    COMMAND = 'python /some/thing.py train'
+    CONDA_ENV = 'dfakjsdfhajkh43981hrt4138r91gh4'
+
+    # set batch parameters
+    batcher = slurmjobs.Singularity(
+        COMMAND, root_dir=os.path.join(ROOT, 'sing'),
+        conda_env=CONDA_ENV, backup=False)
+    assert batcher.name == NAME
+
+    # generate scripts
+    run_script, job_paths = batcher.generate([
+        ('kernel_size', [2, 3, 5]),
+        ('nb_stacks', [1, 2]),
+        ('lr', [1e-4, 1e-3]),
+    ], receptive_field=6)
+    print(run_script, job_paths)
+
+    # check job files
+    found_job_paths = batcher.paths.job.glob()
+    assert set(job_paths) == set(found_job_paths)
+    job_content = pathtree.Path(job_paths[0]).read()
+    assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV))
+
+    # check run file
+    run_content = batcher.paths.run.read()
+    assert all(path in run_content for path in job_paths)
+
+
+
 def test_arg_format():
     Args = slurmjobs.args.Argument
     assert isinstance(Args.get('fire'), slurmjobs.args.FireArgument)
@@ -89,114 +123,110 @@ def test_arg_format():
     assert isinstance(Args.get('sacred'), slurmjobs.args.SacredArgument)
     assert isinstance(Args.get('hydra'), slurmjobs.args.HydraArgument)
 
-    CMD = 'python blah.py'
-    CMD_ = CMD + ' {__all__}'
-    cmd = Args.get('fire').build(
-        CMD_, 5, 'hi', 'hi hey', arg1=[1, 2], a='asdf', b='asdf adf')
-    print('fire', cmd)
-    assert cmd == CMD + " 5 hi 'hi hey' --arg1='[1, 2]' --a=asdf --b='asdf adf'"
+    args = Args.get('fire')(
+        5, 'hi', 'hi hey', arg1=[1, 2], a='asdf', b='asdf adf')
+    print('fire', args)
+    assert args == "5 hi 'hi hey' --arg1='[1, 2]' --a=asdf --b='asdf adf'"
 
-    cmd = Args.get('argparse').build(
-        CMD_, 'hi', flag=True, other=False, arg1=[1, 2], a='asdf', b='asdf adf')
-    print('argparse', cmd)
-    assert cmd == CMD + " --hi --flag --arg1 1 2 -a asdf -b 'asdf adf'"
+    args = Args.get('argparse')(
+        'hi', flag=True, other=False, arg1=[1, 2], a='asdf', b='asdf adf')
+    print('argparse', args)
+    assert args == "--hi --flag --no-other --arg1 1 2 -a asdf -b 'asdf adf'"
 
-    cmd = Args.get('sacred').build(
-        CMD_, 'hi', 'hi hey', arg1=[1, 2], a='asdf', b='asdf adf')
-    print('sacred', cmd)
-    assert cmd == CMD + " with hi 'hi hey' arg1='[1, 2]' a=asdf b='asdf adf'"
+    args = Args.get('sacred')(
+        'hi', 'hi hey', arg1=[1, 2], a='asdf', b='asdf adf')
+    print('sacred', args)
+    assert args == "with hi 'hi hey' arg1='[1, 2]' a=asdf b='asdf adf'"
 
 
     # test
-    cmd = Args.get('fire').build(
-        CMD_, arg1=['a', 'b'], arg2={'a': 5, 'b': 6, 'c': [1, 'b']})
-    print('fire', cmd)
-    assert cmd == CMD + ' --arg1=\'["a", "b"]\' --arg2=\'{"a": 5, "b": 6, "c": [1, "b"]}\''
+    args = Args.get('fire')(
+        arg1=['a', 'b'], arg2={'a': 5, 'b': 6, 'c': [1, 'b']})
+    print('fire', args)
+    assert args == '--arg1=\'["a", "b"]\' --arg2=\'{"a": 5, "b": 6, "c": [1, "b"]}\''
 
-    cmd = Args.get('hydra').build(
-        CMD_, arg1=['a', 'b'], arg2={'a': 5, 'b': 6, 'c': [1, 'b']})
-    print('hydra', cmd)
-    assert cmd == CMD + ' +arg1=\'["a", "b"]\' +arg2=\'{"a": 5, "b": 6, "c": [1, "b"]}\''
+    args = Args.get('hydra')(
+        arg1=['a', 'b'], arg2={'a': 5, 'b': 6, 'c': [1, 'b']})
+    print('hydra', args)
+    assert args == '+arg1=\'["a", "b"]\' +arg2=\'{"a": 5, "b": 6, "c": [1, "b"]}\''
 
-    cmd = Args.get('hydra').build(
-        CMD_, **{
+    args = Args.get('hydra')(
+        **{
             'x': 5,
             'arg1.x': ['a', 'b'],
             'arg2.y': {'a': 5, 'b': 6, 'c': [1, 'b']},
             '++y': 6,
         })
-    print('hydra', cmd)
-    assert cmd == CMD + ' +x=5 +arg1.x=\'["a", "b"]\' +arg2.y=\'{"a": 5, "b": 6, "c": [1, "b"]}\' ++y=6'
+    print('hydra', args)
+    assert args == '+x=5 +arg1.x=\'["a", "b"]\' +arg2.y=\'{"a": 5, "b": 6, "c": [1, "b"]}\' ++y=6'
 
-    cmd = Args.get('hydra', '++').build(
-        CMD_, **{
-            'x': 5,
-            'arg1.x': ['a', 'b'],
-            'arg2.y': {'a': 5, 'b': 6, 'c': [1, 'b']},
-            '++y': 6,
-        })
-    print('hydra', cmd)
-    assert cmd == CMD + ' ++x=5 ++arg1.x=\'["a", "b"]\' ++arg2.y=\'{"a": 5, "b": 6, "c": [1, "b"]}\' ++y=6'
+    args = Args.get('hydra', '++')(**{
+        'x': 5,
+        'arg1.x': ['a', 'b'],
+        'arg2.y': {'a': 5, 'b': 6, 'c': [1, 'b']},
+        '++y': 6,
+    })
+    print('hydra', args)
+    assert args == '++x=5 ++arg1.x=\'["a", "b"]\' ++arg2.y=\'{"a": 5, "b": 6, "c": [1, "b"]}\' ++y=6'
 
 
-    cmd = Args.get('hydra', '').build(
-        CMD_, **{
-            'x': 5,
-            'arg1.x': ['a', 'b'],
-            'arg2.y': {'a': 5, 'b': 6, 'c': [1, 'b']},
-            '++y': 6,
-        })
-    print('hydra', cmd)
-    assert cmd == CMD + ' x=5 arg1.x=\'["a", "b"]\' arg2.y=\'{"a": 5, "b": 6, "c": [1, "b"]}\' ++y=6'
+    args = Args.get('hydra', '')(**{
+        'x': 5,
+        'arg1.x': ['a', 'b'],
+        'arg2.y': {'a': 5, 'b': 6, 'c': [1, 'b']},
+        '++y': 6,
+    })
+    print('hydra', args)
+    assert args == 'x=5 arg1.x=\'["a", "b"]\' arg2.y=\'{"a": 5, "b": 6, "c": [1, "b"]}\' ++y=6'
 
 
 
-def test_multicmd_arg_format():
-    Args = slurmjobs.args.Argument
+# def test_multicmd_arg_format():
+#     Args = slurmjobs.args.Argument
 
-    CMD = '''
-python blah.py {__all__}
-python blorp.py {a} {b}
-python blorp.py {b} {arg1}
-python blorp.py {arg1}
-    '''
-    EXPECTED = '''
-python blah.py --arg1='[1, 2]' --a=asdf --b='asdf adf' --job_id=blah
-python blorp.py --a=asdf --b='asdf adf'
-python blorp.py --b='asdf adf' --arg1='[1, 2]'
-python blorp.py --arg1='[1, 2]'
-    '''
+#     CMD = '''
+# python blah.py {__all__}
+# python blorp.py {a} {b}
+# python blorp.py {b} {arg1}
+# python blorp.py {arg1}
+#     '''
+#     EXPECTED = '''
+# python blah.py --arg1='[1, 2]' --a=asdf --b='asdf adf' --job_id=blah
+# python blorp.py --a=asdf --b='asdf adf'
+# python blorp.py --b='asdf adf' --arg1='[1, 2]'
+# python blorp.py --arg1='[1, 2]'
+#     '''
 
-    kwargs = dict(arg1=[1, 2], a='asdf', b='asdf adf')
-    cmd = Args.get('fire').build(CMD, **kwargs, job_id='blah')
-    print('fire', cmd)
-    assert cmd == EXPECTED
+#     kwargs = dict(arg1=[1, 2], a='asdf', b='asdf adf')
+#     cmd = Args.get('fire')(CMD, **kwargs, job_id='blah')
+#     print('fire', cmd)
+#     assert cmd == EXPECTED
 
-    batcher = slurmjobs.SlurmBatch(
-        CMD, name='blah', root_dir=os.path.join(ROOT, 'slurm'),
-        multicmd=True, backup=False)
+#     batcher = slurmjobs.SlurmBatch(
+#         CMD, name='blah', root_dir=os.path.join(ROOT, 'slurm'),
+#         multicmd=True, backup=False)
 
-    # generate scripts
-    run_script, job_paths = batcher.generate(**kwargs)
-    print(run_script, job_paths)
+#     # generate scripts
+#     run_script, job_paths = batcher.generate(**kwargs)
+#     print(run_script, job_paths)
 
-    # check job files
-    found_job_paths = batcher.paths.job.glob()
-    assert set(job_paths) == set(found_job_paths)
-    job_content = pathtree.Path(job_paths[0]).read()
-    print(job_content)
-    assert EXPECTED in job_content
+#     # check job files
+#     found_job_paths = batcher.paths.job.glob()
+#     assert set(job_paths) == set(found_job_paths)
+#     job_content = pathtree.Path(job_paths[0]).read()
+#     print(job_content)
+#     assert EXPECTED in job_content
 
 
 def test_parameter_grid():
-    params = [
+    g = slurmjobs.Grid([
         ('something', [1, 2]),
         ('nodes', [ (1, 2, 3), (4, 5, 6), (7, 8, 9) ]),
-        (('a', 'b'), [ (1, 3), (2, 5) ]),
+        (('a', 'b'), [ (1, 2), (3, 5) ]),
         ('some_flag', (True,))
-    ]
+    ])
 
-    assert list(slurmjobs.util.expand_grid(params)) == [
+    _compare_grid(g, [
         # something - 1
         {'something': 1, 'nodes': (1, 2, 3), 'a': 1, 'b': 3, 'some_flag': True},
         {'something': 1, 'nodes': (1, 2, 3), 'a': 2, 'b': 5, 'some_flag': True},
@@ -207,7 +237,7 @@ def test_parameter_grid():
         {'something': 1, 'nodes': (7, 8, 9), 'a': 1, 'b': 3, 'some_flag': True},
         {'something': 1, 'nodes': (7, 8, 9), 'a': 2, 'b': 5, 'some_flag': True},
 
-        # something - 1
+        # something - 2
         {'something': 2, 'nodes': (1, 2, 3), 'a': 1, 'b': 3, 'some_flag': True},
         {'something': 2, 'nodes': (1, 2, 3), 'a': 2, 'b': 5, 'some_flag': True},
 
@@ -216,7 +246,78 @@ def test_parameter_grid():
 
         {'something': 2, 'nodes': (7, 8, 9), 'a': 1, 'b': 3, 'some_flag': True},
         {'something': 2, 'nodes': (7, 8, 9), 'a': 2, 'b': 5, 'some_flag': True},
-    ]
+    ])
+
+    g = slurmjobs.Grid([
+        ('a', [1, 2]),
+        ('b', [1, 2]),
+    ], name='train')
+
+    # appends a configuration
+    g = g + slurmjobs.LiteralGrid([{'a': 5, 'b': 5}, {'a': 10, 'b': 10}])
+
+    g = g * slurmjobs.Grid([
+        ('c', [5, 6])
+    ], name='dataset')
+
+    _compare_grid(g, [
+        # g * c=5
+        {'a': 1, 'b': 1, 'c': 5},
+        {'a': 1, 'b': 1, 'c': 6},
+        {'a': 1, 'b': 2, 'c': 5},
+        {'a': 1, 'b': 2, 'c': 6},
+        {'a': 2, 'b': 1, 'c': 5},
+        {'a': 2, 'b': 1, 'c': 6},
+        {'a': 2, 'b': 2, 'c': 5},
+        {'a': 2, 'b': 2, 'c': 6},
+        {'a': 5, 'b': 5, 'c': 5},
+        {'a': 5, 'b': 5, 'c': 6},
+        {'a': 10, 'b': 10, 'c': 5},
+        {'a': 10, 'b': 10, 'c': 6},
+    ])
+
+    xs = [1, 2]
+    g = slurmjobs.Grid([
+        # basic
+        ('a', xs),
+        # paired
+        (('b', 'c'), ([1, 1, 2, 2], [1, 2, 1, 2])),
+        # literal
+        [{'d': i} for i in xs],
+        # dict generator
+        ({'e': i} for i in xs),
+        # function
+        lambda: [{'f': i} for i in xs],
+        # function that returns a generator
+        lambda: ({'g': i} for i in xs),
+    ])
+    keys = 'abcdefg'
+    _compare_grid(g, [
+        dict(zip(keys, vals)) for vals in
+        itertools.product(*([xs]*len(keys)))
+    ], no_len=True)
+
+    # raise NotImplementedError("Write tests for grid sum/mult/sub/literal")
+
+
+def _compare_grid(g, expected, no_len=False):
+    try:
+        assert list(g) == expected
+        try:
+            assert len(g) == len(expected)
+        except TypeError:
+            if not no_len:
+                raise
+        else:
+            if no_len:
+                raise RuntimeError("This grid should not have a length.")
+    except Exception:
+        for d in g:
+            print(d)
+        raise
+
+
+
 
 
 def do_something(fname, content='hi'):
