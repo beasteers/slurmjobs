@@ -25,9 +25,8 @@ copyright = '2021, Bea Steers'
 author = 'Bea Steers'
 
 # The full version, including alpha/beta/rc tags
-release = '0.3.0'
-import starstar
-release = starstar.__version__
+import slurmjobs
+release = slurmjobs.__version__
 
 
 # -- General configuration ---------------------------------------------------
