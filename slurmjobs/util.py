@@ -109,6 +109,20 @@ def flatten(args, cls=(list, tuple, set, types.GeneratorType)):
         yield args
 
 
+def clsattrdiff(cls, base_cls=None, funcs=False):
+    '''Get the non-function attributes that exist on ``cls``, but not on ``base_cls``.'''
+    attrs = dict()
+    base_dict = base_cls.__dict__ if base_cls is not None else {}
+    i = cls.__mro__.index(base_cls) if base_cls is not None else None
+    for cls_i in cls.__mro__[:i][::-1]:
+        for k, v in cls_i.__dict__.items():
+            if (not k.startswith('_') and 
+                    k not in base_dict and 
+                    (funcs or not callable(v))):
+                attrs[k] = v
+    return attrs
+
+
 '''
 
 Argument

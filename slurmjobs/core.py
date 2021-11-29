@@ -109,7 +109,11 @@ class Jobs:
 
     def __init__(self, command, name=None, cli=None, 
                  root_dir=None, backup=True, job_id=True, 
+                 template=None, run_template=None,
                  **options):
+        self.template = template or self.template
+        self.run_template = run_template or self.run_template
+
         self.options = dict(self.options, **options)
         self.command = command
         self.name = name or util.command_to_name(command)
