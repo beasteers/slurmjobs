@@ -7,7 +7,7 @@
 {%- if n_cpus or n_gpus %}
 #SBATCH --cpus-per-task={{ n_cpus|default(n_gpus or 1) }}{% endif %}
 {%- if n_gpus %}
-#SBATCH --gres=gpu:={{ n_gpus }}{% endif %}
+#SBATCH --gres=gpu:{{ n_gpus }}{% endif %}
 {%- if time %}
 #SBATCH --time={{ time }}{% endif %}
 {%- if email %}
