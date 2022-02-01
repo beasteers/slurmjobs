@@ -8,3 +8,5 @@ from .receipt import *
 
 # cute little alias
 Sing = Singularity
+
+get_cli = args.Argument.get

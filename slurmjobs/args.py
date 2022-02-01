@@ -55,13 +55,14 @@ class Argument:
                 to a bash command.
         '''
         a2, kw2 = self._format_args(*a, **kw)
-        items = util.flatten(
+        items = (
             [self.prefix]*bool(self.prefix) + 
-            a2 + list(kw2.values()) + 
+            a2 + [x for xs in kw2.values() if xs for x in xs] + 
             [self.suffix]*bool(self.suffix))
 
+        indent = '\\\n' + ' '*indent if indent is not None else ''
         return ' '.join((
-            '{}{}'.format('\\\n' + ' '*indent if indent is not None else '', x)
+            f'{indent}{" ".join(x) if isinstance(x, list) else x}' 
             for x in items))
 
     def format_arg(self, k, v=...):
@@ -110,15 +111,19 @@ class ArgparseArgument(Argument):
 
     def format_arg(self, k, v=...):
         if v is False:
-            return self.format_key(f'no-{k}')
+            return [self.format_key(f'no-{k}')]
         key = self.format_key(k)
         if v is True or v is ...:
-            return key
+            return [key]
         if v is None:
-            return None
+            return []
         if not isinstance(v, (list, tuple, set)):
             v = [v]
-        return [key] + [self.format_value(x) for x in v]
+        # this will all be joined to gether as strings. The extra
+        # list on the outside means that it will appear on the same line
+        # when indentation is requested
+        vs = [self.format_value(x) for x in v]
+        return [ [key] + vs ]
 
     def format_key(self, k):
         return '{}{}'.format(self.long_opt if len(k) > 1 else self.short_opt, k)
@@ -158,9 +163,9 @@ class HydraArgument(FireArgument):
 
     def format_arg(self, k, v=...):
         if v is ...:
-            return self.format_value(k)
+            return [self.format_value(k)]
         kw_fmt = (
             self.kw_fmt
             if any(k.startswith(pfx) for pfx in self.available_prefixes if pfx)
             else self.kw_fmt_prefixed)
-        return kw_fmt.format(key=k, value=self.format_value(v))
+        return [kw_fmt.format(key=k, value=self.format_value(v))]

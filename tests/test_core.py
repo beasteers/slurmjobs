@@ -18,14 +18,27 @@ def test_basic():
     CONDA_ENV = 'dfakjsdfhajkh43981hrt4138r91gh4'
     EMAIL = 'bea.steers@gmail.com'
 
+    with pytest.raises(TypeError):
+        batcher = slurmjobs.Slurm(
+            COMMAND, email=EMAIL,
+            root_dir=os.path.join(ROOT, 'slurm'),
+            conda_env=CONDA_ENV,
+            sbtach={},
+            backup=False)
+
     # set batch parameters
     batcher = slurmjobs.Slurm(
         COMMAND, email=EMAIL,
         root_dir=os.path.join(ROOT, 'slurm'),
         conda_env=CONDA_ENV,
         modules=['cuda9'],
+        sbatch={'n_gpus': 2},
         backup=False)
     assert batcher.name == NAME
+
+    print(batcher.options['sbatch'])
+    # assert batcher.options['sbatch']['cpus-per-task'] == 2
+    assert batcher.options['sbatch']['gres'] == 'gpu:2'
 
     assert all(m in batcher.options['modules'] for m in batcher.module_presets['cuda9'])
 
@@ -225,6 +238,19 @@ def test_parameter_grid():
         (('a', 'b'), [ (1, 2), (3, 5) ]),
         ('some_flag', (True,))
     ])
+
+    assert g['something'] == [1, 2]
+    g['something'] = [3, 4]
+    assert g['something'] == [3, 4]
+    g['something'] = [1, 2]
+    assert g['something'] == [1, 2]
+
+    # assert g['b'] == (3, 5)
+    # print(g[('a', 'b')])
+    # g['b'] = [3, 4]
+    # assert g['b'] == [3, 4]
+    # g['b'] = (3, 5)
+    # assert g['b'] == (3, 5)
 
     _compare_grid(g, [
         # something - 1

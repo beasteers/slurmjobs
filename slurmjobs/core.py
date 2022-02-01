@@ -114,7 +114,21 @@ class Jobs:
         self.template = template or self.template
         self.run_template = run_template or self.run_template
 
-        self.options = dict(self.options, **options)
+        # raise an error if any unrecognized arguments were passed.
+        wrong_options = set(options) - set(self.options)
+        if wrong_options:
+            raise TypeError(
+                f"Unrecognized options: {wrong_options}. If you extended your template to use additional options, "
+                "please give them default values in your Class.options dictionary.")
+        
+        # copy the options dict and add in new values
+        self.options = dict(self.options)
+        for k, v in options.items():
+            dft = self.options[k]
+            if isinstance(dft, dict):
+                v = dict(dft, **(v or {}))
+            self.options[k] = v
+
         self.command = command
         self.name = name or util.command_to_name(command)
         self.cli = Argument.get(self.cli if cli is None else cli)
@@ -161,17 +175,23 @@ class Jobs:
             v = f'{v:.{self.float_precision}g}'
         return k, v
 
-    def format_job_id(self, args, keys=None, name=None):
+    def format_job_id(self, args, keys=None, name=None, ignore_keys=None):
         '''Convert a dictionary to a job ID.
 
         Arguments:
             args (GridItem): The job dictionary.
             keys (list, tuple): The keys that we want to include in the job ID.
-            name (str): The job name to include in the job ID.
+            name (str): The job name to include in the job ID. By default
+                this will be the name associated with the Jobs object. Pass 
+                ``False`` to use no name.
         '''
+        name = name or self.name if name is not False else False
         # format each key
         parts = []
-        for k in args if keys is None else keys:
+        keys = getattr(args, 'grid_keys', args) if keys is None else keys
+        if ignore_keys:
+            keys = (k for k in keys if k not in ignore_keys)
+        for k in keys:
             if k not in args:
                 if self.omit_missing_keys_from_job_id:
                     continue
@@ -183,10 +203,10 @@ class Jobs:
 
         # join them together
         return self.job_id_item_sep.join(map(
-            str, [name]*bool(name) + parts))
+            str, [name]*bool(name) + parts)).replace(' ', '')
 
 
-    def generate(self, grid_=None, *a, **kw):
+    def generate(self, grid_=None, *a, ignore_job_id_keys=None, **kw):
         '''Generate slurm jobs for every combination of parameters.
         
         Arguments:
@@ -210,7 +230,9 @@ class Jobs:
         for d in grid:
             d.positional += a
             d.update(kw)
-            job_id = self.format_job_id(d, d.grid_keys, name=self.name)
+            job_id = self.format_job_id(
+                d, d.grid_keys, name=self.name, 
+                ignore_keys=ignore_job_id_keys)
             if job_id in used:
                 raise RuntimeError(f"Duplicate job ID: {job_id}")
             job_paths.append(self.generate_job(job_id, _grid=grid, _args=d))
@@ -338,11 +360,15 @@ class Slurm(Jobs):
         sbatch={
             'time': '3-0',
             'mem': '48GB',
+            # 'n_gpus': None,
+            # 'n_cpus': None,
+            # 'nodes': None,
         },
-        n_gpus=0,
-        n_cpus=None,
-        nodes=None,
-        modules=None,
+        # n_gpus=0,
+        # n_cpus=None,
+        # nodes=None,
+        modules=None,  # no need for modules with singularity
+        bashrc=False,  # disable bashrc by default
     )
     template = '''{% extends 'job.sbatch.j2' %}
     '''
@@ -362,11 +388,27 @@ class Slurm(Jobs):
         'anaconda3': ['anaconda3/2020.07'],
     }
 
-    def __init__(self, *a, sbatch=None, modules=None, **kw):
-        sbatch = dict(self.options['sbatch'], **(sbatch or {}))
+    def __init__(self, *a, sbatch=None, modules=None, n_gpus=None, n_cpus=None, **kw):
         modules = util.flatten(
             self.module_presets.get(m, m) for m in (modules or ()))
-        super().__init__(*a, modules=modules, **kw)
+        super().__init__(*a, modules=modules, sbatch=sbatch, **kw)
+
+        # handle n_cpus n_gpus
+        sbatch = self.options['sbatch']
+        n_cpus = sbatch.pop('n_cpus', None)
+        n_gpus = sbatch.pop('n_gpus', None)
+        gres = sbatch.get('gres')
+        if n_cpus:
+            if sbatch.get('cpus-per-task'):
+                raise ValueError("n_cpus specified as well as cpus-per-task")
+            sbatch['cpus-per-task'] = n_gpus or 1 if n_cpus is None else n_cpus
+        if n_gpus:
+            if sbatch.get('gres'):
+                raise ValueError("n_gpus specified as well as gres. Please choose one or the other.")
+            sbatch['gres'] = f'gpu:{n_gpus or 0}'
+            # sbatch['gpus-per-task'] = n_gpus or 0
+        if gres and isinstance(gres, int):
+            sbatch['gres'] = f'gpu:{gres}'
 
     def get_paths(self, **kw):
         paths = pathtree.tree(self.root_dir, {'{name}': {
@@ -408,7 +450,7 @@ class Singularity(Slurm):
     sif_dir = '/scratch/work/public/singularity/'
     options = dict(
         Slurm.options,
-        singularity_sif='cuda11.0-cudnn8-devel-ubuntu18.04.sif',
+        sif='cuda11.0-cudnn8-devel-ubuntu18.04.sif',
         overlay='overlay-5GB-200K.ext3',
         readonly=True,
         overlays=None,
@@ -421,7 +463,7 @@ class Singularity(Slurm):
         if overlay is not None:
             kw['overlay'] = overlay
         if sif is not None:
-            kw['singularity_sif'] = sif
+            kw['sif'] = sif
         super().__init__(command, *a, **kw)
-        self.options['singularity_sif'] = self.options['singularity_sif'] and os.path.join(
-            self.sif_dir, self.options['singularity_sif'])
+        self.options['sif'] = self.options['sif'] and os.path.join(
+            self.sif_dir, self.options['sif'])

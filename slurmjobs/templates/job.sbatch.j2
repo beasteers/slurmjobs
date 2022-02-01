@@ -2,22 +2,16 @@
 {% block header -%}
 {% block arguments -%}
 #SBATCH --job-name={{ job_id }}
-{%- if nodes %}
-#SBATCH --nodes={{ nodes }}{% endif %}
-{%- if n_cpus or n_gpus %}
-#SBATCH --cpus-per-task={{ n_cpus|default(n_gpus or 1) }}{% endif %}
-{%- if n_gpus %}
-#SBATCH --gres=gpu:{{ n_gpus }}{% endif %}
-{%- if time %}
-#SBATCH --time={{ time }}{% endif %}
 {%- if email %}
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user={{ email }}
 {%- endif %}
 #SBATCH --output={{ paths.output }}
 {% for key, val in sbatch.items() -%}
+{%- if val is not none -%}
     #SBATCH --{{ key|replace('_', '-') }}={{ val }}
-{% endfor %}
+{% endif %}
+{%- endfor %}
 {%- endblock %}
 
 {{ super() }}

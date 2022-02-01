@@ -52,6 +52,11 @@ class BaseGrid:
     '''
     grid = ()
 
+    def __init__(self, name=None, ignore_job_id_keys=None, **constants) -> None:
+        self.name = name
+        self.ignore_job_id_keys = ignore_job_id_keys or []
+        self.constants = constants
+
     def __repr__(self):
         '''A nice string representation of the grid.'''
         return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr(self.grid))))
@@ -184,16 +189,68 @@ class Grid(BaseGrid):
     even use generators in the first place, but I figured why limit the implementation if 
     it can be used for other things too.
     '''
-    def __init__(self, grid, name=None, **constants):
-        self.grid = list(grid.items()) if isinstance(grid, dict) else grid
-        self.name = name
-        self.constants = constants
+    _is_expandable = False
+    _easy_access_nested = False
+    def __init__(self, __grid, name=None, **constants):
+        self.grid = list(__grid.items()) if isinstance(__grid, dict) else __grid
+        super().__init__(name, **constants)
 
     def __repr__(self):
         return '[\n{}]'.format(''.join(map('  {!r},\n'.format, self.grid)))
 
     def __len__(self):
         return prod(self._as_grid_length(g) for g in self.grid)
+
+    def __getitem__(self, index):
+        '''Get the series for a variable name.'''
+        res = self._get_by_key(self.grid, index)
+        if res is not None:
+            return res
+        raise KeyError(index)
+
+    def __setitem__(self, index, value):
+        res = self._set_by_key(self.grid, index, value)
+        if res:
+            return
+        raise KeyError(index)
+
+    def _get_by_key(self, grid, name):
+        for xs in grid:
+            try:
+                len(xs)
+                k, v = xs
+            except (TypeError, ValueError):
+                continue
+            if isinstance(k, dict): continue
+            if self._easy_access_nested and not isinstance(name, (list, tuple)) and isinstance(k, (list, tuple)):
+                res = self._get_by_key(zip(*xs), name)
+                if res is None:
+                    continue
+                return res
+            if k == name:
+                return v
+
+    def _set_by_key(self, grid, name, value):
+        for i, xs in enumerate(grid):
+            try:
+                len(xs)  # don't unpack generators
+                k, v = xs                
+            except (TypeError, ValueError):
+                continue
+            if isinstance(k, dict): continue
+            if self._easy_access_nested and not isinstance(name, (list, tuple)) and isinstance(k, (list, tuple)):
+                rep = list(zip(k, v))
+                if self._set_by_key(rep, name, value):
+                    grid[i] = list(zip(*rep))
+                    return True
+                continue
+            if k == name:
+                grid[i] = k, value
+                return True
+        if self.is_expandable:
+            grid.append((name, value))
+            return True
+        return False
 
     def _as_grid_length(self, xs):
         '''Determine the length of a grid product item.'''
@@ -246,7 +303,8 @@ class Grid(BaseGrid):
             # expand grid pairs [('a', 'b'), ([1, 2, 3], [1, 2, 3])]
             yield GridItem(
                 dict({k: v for d in ds for k, v in d.items()}, **self.constants), 
-                [k for d in ds for k in d], self.name)
+                [k for d in ds for k in d], self.name, 
+                ignore_keys=self.ignore_job_id_keys)
 
 
 class LiteralGrid(BaseGrid):
@@ -273,10 +331,9 @@ class LiteralGrid(BaseGrid):
             {'a': 2, 'b': 2},
         ]
     '''
-    def __init__(self, grid, name=None, **constants):
-        self.grid = [grid] if isinstance(grid, dict) else grid
-        self.name = name
-        self.constants = constants
+    def __init__(self, __grid, name=None, **constants):
+        self.grid = [__grid] if isinstance(__grid, dict) else __grid
+        super().__init__(name, **constants)
 
     def __repr__(self):
         return '[\n{}]'.format(''.join(map('  {!r},\n'.format, self.grid)))
@@ -287,7 +344,10 @@ class LiteralGrid(BaseGrid):
     def __iter__(self):
         for d in self.grid:
             # expand grid pairs [('a', 'b'), ([1, 2, 3], [1, 2, 3])]
-            yield GridItem(dict(d, **self.constants), list(d), self.name)
+            keys = d.grid_keys if isinstance(d, _BaseGridItem) else list(d)
+            yield GridItem(
+                dict(d, **self.constants), keys, self.name, 
+                ignore_keys=self.ignore_job_id_keys)
             # should we just use dict's internal ordering for the keys?
 
 
@@ -302,7 +362,9 @@ class GridItem(_BaseGridItem):
     '''Represents a dictionary of arguments, the keys that vary, 
     and a name for the group of args.
     '''
-    def __init__(self, grid=None, keys=(), name=None, positional=()):
+    def __init__(self, grid=None, keys=(), name=None, positional=(), ignore_keys=None):
+        if ignore_keys:
+            keys = [k for k in keys if k not in ignore_keys]
         self.grid_keys = keys
         self.name = name
         self.positional = positional or ()
@@ -320,7 +382,7 @@ class GridItemBundle(_BaseGridItem):
     '''Merges GridItems/GridBundles. Merges the dict, keys, and any groups.
     Can use ``.find(name)`` so search for a subset of items.
     '''
-    def __init__(self, *grids, name=None):
+    def __init__(self, *grids, name=None, ignore_keys=None):
         merged = {}
         groups = {}
         keys = []
@@ -336,6 +398,8 @@ class GridItemBundle(_BaseGridItem):
             groups[name] = dict(groups.get(name, ()), **merged)
 
         self.name = name
+        if ignore_keys:
+            keys = (k for k in keys if k not in ignore_keys)
         self.grid_keys = unique(keys)
         self.groups = groups
         super().__init__(merged)
@@ -371,7 +435,7 @@ class GridChain(BaseGrid):
     '''
     def __init__(self, *grids, name=None):
         self.grid = grids
-        self.name = name
+        super().__init__(name)
 
     def __repr__(self):
         return ' + '.join(map(repr, self.grid))
@@ -407,7 +471,7 @@ class GridCombo(BaseGrid):
     '''
     def __init__(self, *grids, name=None):
         self.grid = grids
-        self.name = name
+        super().__init__(name)
 
     def __repr__(self):
         return ' * '.join(map('({!r})'.format, self.grid))
@@ -441,7 +505,7 @@ class GridOmission(BaseGrid):
     def __init__(self, grid, omission, name=None):
         self.grid = grid
         self.omission = omission
-        self.name = name
+        super().__init__(name)
 
     def __repr__(self):
         return ' - '.join(map('({!r})'.format, [self.grid, self.omission]))

@@ -7,17 +7,17 @@
 {% block singularity_enter %}
 
 ###### ( hop into the singularity o_O )
-{% if singularity_sif -%}
+{% if sif -%}
 singularity exec \
-    {%- if n_gpus %} 
+    {%- if n_gpus %}
     --nv \{% endif %}
-    {%- if overlay %} 
+    {%- if overlay %}
     --overlay {{ overlay }}{% if readonly %}:ro{% endif %} \{% endif %}
     {%- if overlays %}{% for overlay in overlays %}
     --overlay {{ overlay }} \{% endfor %}{% endif %}
     {%- if readonly_overlays %}{% for overlay in readonly_overlays -%}
     --overlay {{ overlay }}:ro \{% endfor %}{% endif %}
-    {{ singularity_sif }} \
+    {{ sif }} \
     /bin/bash << EOF
 echo "@: entered singularity container"
 {{ singularity_init_script }}
@@ -30,7 +30,7 @@ echo "@: entered singularity container"
 
 
 {%- block singularity_exit %}
-{% if singularity_sif -%}
+{% if sif -%}
 ###### (escape from the singularity @o@ )
 echo "@: exiting singularity container"
 exit 0;
