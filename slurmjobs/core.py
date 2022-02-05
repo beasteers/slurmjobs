@@ -328,6 +328,11 @@ class Shell(Jobs):
 
     '''
 
+    options = dict(
+        Jobs.options,
+        background=False,
+    )
+
     template = '''{% extends 'job.shell.j2' %}
     '''
 
