@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import shlex
 import types
@@ -149,12 +150,22 @@ def shlex_repr(v):
     '''Prepare a variable for bash. This will serialize the object using json 
     and then quote the variable if it contains any spaces/bash-specific characters.
     '''
+    v = json_safe_numpy(v)
     # v = repr(v)
-    v = json.dumps(v)
+    v = json.dumps(v)  # TODO: is there a better option?
     # if v is a quoted string, remove the quotes
     if len(v) >= 2 and v[0] == v[-1] and v[0] in '"\'':
         v = v[1:-1]
     return shlex.quote(v) # only quote if necessary (has spaces or bash chars)
+
+def json_safe_numpy(obj):
+    if 'numpy' in sys.modules:  # don't need to check if it's not imported
+        import numpy as np
+        if isinstance(obj, np.generic):
+            return obj.item()
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+    return obj
 
 
 def escape(txt, chars='"\''):
