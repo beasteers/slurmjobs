@@ -7,7 +7,7 @@ TODO:
 import os
 import itertools
 import slurmjobs
-import pathtree
+import pathtrees
 import pytest
 
 ROOT = os.path.dirname(__file__)
@@ -48,19 +48,20 @@ def test_basic():
         ('nb_stacks', [1, 2]),
         ('lr', [1e-4, 1e-3]),
     ], receptive_field=6)
+    job_paths = [str(p) for p in job_paths]
     print(run_script, job_paths)
     assert len(job_paths) == 2 * 2 * 3
 
     # check job files
     found_job_paths = batcher.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
-    job_content = pathtree.Path(job_paths[0]).read()
+    job_content = pathtrees.Path(job_paths[0]).read_text()
     print(job_content)
     print([x for x in (NAME, COMMAND, CONDA_ENV, EMAIL) if x not in job_content])
     assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV, EMAIL))
 
     # check run file
-    run_content = batcher.paths.run.read()
+    run_content = batcher.paths.run.read_text()
     assert all(path in run_content for path in job_paths)
 
     # test single generate
@@ -85,16 +86,17 @@ def test_shell():
         ('nb_stacks', [1, 2]),
         ('lr', [1e-4, 1e-3]),
     ], receptive_field=6)
+    job_paths = [str(p) for p in job_paths]
     print(run_script, job_paths)
 
     # check job files
     found_job_paths = batcher.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
-    job_content = pathtree.Path(job_paths[0]).read()
+    job_content = pathtrees.Path(job_paths[0]).read_text()
     assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV))
 
     # check run file
-    run_content = batcher.paths.run.read()
+    run_content = batcher.paths.run.read_text()
     assert all(path in run_content for path in job_paths)
 
 
@@ -120,11 +122,11 @@ def test_sing():
     # check job files
     found_job_paths = batcher.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
-    job_content = pathtree.Path(job_paths[0]).read()
     assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV))
+    job_content = pathtrees.Path(job_paths[0]).read_text()
 
     # check run file
-    run_content = batcher.paths.run.read()
+    run_content = batcher.paths.run.read_text()
     assert all(path in run_content for path in job_paths)
 
 
@@ -226,7 +228,7 @@ def test_arg_format():
 #     # check job files
 #     found_job_paths = batcher.paths.job.glob()
 #     assert set(job_paths) == set(found_job_paths)
-#     job_content = pathtree.Path(job_paths[0]).read()
+#     job_content = pathtree.Path(job_paths[0]).read_text()
 #     print(job_content)
 #     assert EXPECTED in job_content
 

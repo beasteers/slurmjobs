@@ -19,7 +19,7 @@ import os
 import time
 import pprint
 import jinja2
-import pathtree
+import pathtrees
 from .grid import *
 from . import util
 from .args import Argument
@@ -137,11 +137,13 @@ class Jobs:
         # paths
         self.root_dir = root_dir or self.root_dir
         self.paths = self.get_paths()
-        if 'batch_dir' in self.paths and len(self.paths.batch_dir.join('*').glob()):
+        if 'batch_dir' in self.paths and len(self.paths.batch_dir.glob('*')):
             if backup:
-                util.maybe_backup(self.paths.batch_dir)
+                pathtrees.backup(self.paths.batch_dir)
             else:
-                self.paths.batch_dir.rmglob(include=True)
+                import shutil
+                assert os.path.abspath(str(self.paths.batch_dir)) != '/', "Ummmmm..... what do you think you're doing... rm -rf / ???"
+                shutil.rmtree(str(self.paths.batch_dir))
 
     def format_id_item(self, k, v):
         '''Formats a key-value pair for the job ID. 
@@ -202,8 +204,8 @@ class Jobs:
                 parts.append(str(formatted))
 
         # join them together
-        return self.job_id_item_sep.join(map(
-            str, [name]*bool(name) + parts)).replace(' ', '')
+        job_id = self.job_id_item_sep.join(map(str, [name]*bool(name) + parts))
+        return job_id.replace(' ', '').replace('\n', '').replace('\t', '')
 
 
     def generate(self, grid_=None, *a, ignore_job_id_keys=None, **kw):
@@ -242,7 +244,7 @@ class Jobs:
 
         # store the current timestamp
         if 'time_generated' in self.paths.paths:
-            self.paths.time_generated.write(time.time())
+            self.paths.time_generated.write_text(str(time.time()))
 
         return run_script, job_paths
     
@@ -260,7 +262,7 @@ class Jobs:
         args.positional += a
 
         # generate job file
-        paths.job.up().make()
+        paths.job.parent.mkdir(parents=True, exist_ok=True)
         with open(paths.job, "w") as f:
             f.write(env.from_string(self.template).render(
                 job_id=job_id,
@@ -273,10 +275,9 @@ class Jobs:
             ).lstrip())
 
         if 'output' in paths.paths:
-            paths.output.up().make()
+            paths.output.parent.mkdir(parents=True, exist_ok=True)
 
         return paths.job.format()
-
 
     def generate_run_script(self, _job_paths, _grid=None, **kw):
         '''Generate a job run script that will submit all jobs.'''
@@ -295,7 +296,7 @@ class Jobs:
         return file_path
 
     def get_paths(self, **kw):
-        paths = pathtree.tree(self.root_dir, {'{name}': {
+        paths = pathtrees.tree(self.root_dir, {'{name}': {
             '': 'batch_dir',
             '{job_id}.job.sh': 'job',
             'run.sh': 'run',
@@ -411,7 +412,7 @@ class Slurm(Jobs):
             sbatch['gres'] = f'gpu:{gres}'
 
     def get_paths(self, **kw):
-        paths = pathtree.tree(self.root_dir, {'{name}': {
+        paths = pathtrees.tree(self.root_dir, {'{name}': {
             '': 'batch_dir',
             '{job_id}.sbatch': 'job',
             'run.sh': 'run',
@@ -419,6 +420,9 @@ class Slurm(Jobs):
             'time_generated': 'time_generated',
         }}).update(name=self.name, **kw)
         return paths
+
+# alias
+SBatch = Slurm
 
 
 class Singularity(Slurm):
