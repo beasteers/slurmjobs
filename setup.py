@@ -18,7 +18,7 @@ setuptools.setup(name='slurmjobs',
                  package_data={'slurmjobs': ['templates/*.j2']},
                  scripts=glob.glob('scripts/**/*.sh'),
                  packages=setuptools.find_packages(),
-                 install_requires=['path-tree', 'Jinja2'],
+                 install_requires=['pathtrees', 'Jinja2'],
                  license=open('README.md').readline().strip(),
                  extras_require={
                     'test': ['pytest', 'pytest-cov'],
