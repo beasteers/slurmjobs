@@ -47,7 +47,7 @@ def test_basic():
         ('kernel_size', [2, 3, 5]),
         ('nb_stacks', [1, 2]),
         ('lr', [1e-4, 1e-3]),
-    ], receptive_field=6)
+    ], receptive_field=6)#, dependency=lambda d: batcher.format_job_id(d, name='prepare-xxxxxx')
     job_paths = [str(p) for p in job_paths]
     print(run_script, job_paths)
     assert len(job_paths) == 2 * 2 * 3
@@ -58,7 +58,7 @@ def test_basic():
     job_content = pathtrees.Path(job_paths[0]).read_text()
     print(job_content)
     print([x for x in (NAME, COMMAND, CONDA_ENV, EMAIL) if x not in job_content])
-    assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV, EMAIL))
+    assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV, EMAIL))#, '--dependency', 'prepare-xxxxxx'
 
     # check run file
     run_content = batcher.paths.run.read_text()
@@ -116,14 +116,15 @@ def test_sing():
         ('kernel_size', [2, 3, 5]),
         ('nb_stacks', [1, 2]),
         ('lr', [1e-4, 1e-3]),
-    ], receptive_field=6)
+    ], receptive_field=6) #, dependency=lambda d: batcher.format_job_id(d, name='prepare-xxxxxx')
+    job_paths = [str(p) for p in job_paths]
     print(run_script, job_paths)
 
     # check job files
     found_job_paths = batcher.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
-    assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV))
     job_content = pathtrees.Path(job_paths[0]).read_text()
+    assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV))#, '--dependency', 'prepare-xxxxxx'
 
     # check run file
     run_content = batcher.paths.run.read_text()
