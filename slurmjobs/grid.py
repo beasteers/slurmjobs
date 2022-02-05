@@ -365,7 +365,7 @@ class GridItem(_BaseGridItem):
     def __init__(self, grid=None, keys=(), name=None, positional=(), ignore_keys=None):
         if ignore_keys:
             keys = [k for k in keys if k not in ignore_keys]
-        self.grid_keys = keys
+        self.grid_keys = list(keys or ())
         self.name = name
         self.positional = positional or ()
         super().__init__(() if grid is None else grid)
@@ -375,6 +375,17 @@ class GridItem(_BaseGridItem):
 
     def find(self, name):
         return self if self.name == name else None
+
+    def pop(self, key, *a, **kw):
+        x = super().pop(key, *a, **kw)
+        if key in self.grid_keys:
+            self.grid_keys.remove(key)
+        return x
+
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        if key in self.grid_keys:
+            self.grid_keys.remove(key)
 
     
 
