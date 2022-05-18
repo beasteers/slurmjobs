@@ -8,8 +8,8 @@
 
 ###### ( hop into the singularity o_O )
 {% if sif -%}
-singularity exec \
-    {%- if n_gpus %}
+singularity exec {{ singularity_args }} \
+    {%- if nv %}
     --nv \{% endif %}
     {%- if overlay %}
     --overlay {{ overlay }}{% if readonly %}:ro{% endif %} \{% endif %}

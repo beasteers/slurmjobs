@@ -20,11 +20,14 @@ Installation
 
 .. code-block:: bash
 
-   pip install slurmjobs==1.0.0a1
+   pip install slurmjobs
+   
+   
+..    ==1.0.0a1
 
-.. note::
+.. .. note::
 
-   this is a pre-release until after paper-submission/holiday time when I can review it with my ✨friends✨ and they can critique it!
+..    this is a pre-release until after paper-submission/holiday time when I can review it with my ✨friends✨ and they can critique it!
 
 Usage
 ---------------

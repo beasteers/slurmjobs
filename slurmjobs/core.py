@@ -394,15 +394,15 @@ class Slurm(Jobs):
         'anaconda3': ['anaconda3/2020.07'],
     }
 
-    def __init__(self, *a, sbatch=None, modules=None, n_gpus=None, n_cpus=None, **kw):
+    def __init__(self, *a, sbatch=None, modules=None, n_gpus=None, n_cpus=None, nv=None, **kw):
         modules = util.flatten(
             self.module_presets.get(m, m) for m in (modules or ()))
         super().__init__(*a, modules=modules, sbatch=sbatch, **kw)
 
         # handle n_cpus n_gpus
         sbatch = self.options['sbatch']
-        n_cpus = sbatch.pop('n_cpus', None)
-        n_gpus = sbatch.pop('n_gpus', None)
+        n_cpus = n_cpus if n_cpus is not None else sbatch.pop('n_cpus', None)
+        n_gpus = n_gpus if n_gpus is not None else sbatch.pop('n_gpus', None)
         gres = sbatch.get('gres')
         if n_cpus:
             if sbatch.get('cpus-per-task'):
@@ -415,6 +415,7 @@ class Slurm(Jobs):
             # sbatch['gpus-per-task'] = n_gpus or 0
         if gres and isinstance(gres, int):
             sbatch['gres'] = f'gpu:{gres}'
+        self.options['nv'] = bool(n_gpus or sbatch.get('gres')) if nv is None else nv
 
     def get_paths(self, **kw):
         paths = pathtrees.tree(self.root_dir, {'{name}': {

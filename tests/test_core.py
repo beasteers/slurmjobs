@@ -100,16 +100,21 @@ def test_shell():
     assert all(path in run_content for path in job_paths)
 
 
-def test_sing():
-    NAME = 'some.thing'
+@pytest.mark.parametrize("n_gpus", [0, 2])
+def test_sing(n_gpus):
+    NAME = f'some.thing-gpu{n_gpus}'
     COMMAND = 'python /some/thing.py train'
     CONDA_ENV = 'dfakjsdfhajkh43981hrt4138r91gh4'
+    MEM = '33GB'
 
     # set batch parameters
     batcher = slurmjobs.Singularity(
-        COMMAND, root_dir=os.path.join(ROOT, 'sing'),
-        conda_env=CONDA_ENV, backup=False)
+        COMMAND, root_dir=os.path.join(ROOT, 'sing'), name=NAME,
+        conda_env=CONDA_ENV, backup=False, n_gpus=n_gpus,
+        sbatch=dict(mem=MEM))
     assert batcher.name == NAME
+
+    print(batcher.options)
 
     # generate scripts
     run_script, job_paths = batcher.generate([
@@ -124,7 +129,13 @@ def test_sing():
     found_job_paths = batcher.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
     job_content = pathtrees.Path(job_paths[0]).read_text()
-    assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV))#, '--dependency', 'prepare-xxxxxx'
+    for x in (NAME, COMMAND, CONDA_ENV):
+        assert x in job_content
+    if n_gpus:
+        assert '--nv' in job_content
+        assert f'#SBATCH --gres=gpu:{n_gpus}' in job_content
+        assert f'#SBATCH --mem={MEM}' in job_content
+    #, '--dependency', 'prepare-xxxxxx'
 
     # check run file
     run_content = batcher.paths.run.read_text()
