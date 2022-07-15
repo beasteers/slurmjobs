@@ -1,0 +1,40 @@
+#!/bin/bash
+{% block header -%}
+#########################
+#
+# Job: {{ job_id }}
+# Args: 
+{{ args|pprint|comment }}
+#
+#########################
+{% endblock %}
+
+{% block body -%}
+
+{% if run_dir -%}
+    cd {{ run_dir }}
+{% endif -%}
+
+{% if set_e -%}
+    set -e
+{% endif -%}
+
+{% if bashrc -%}
+    . ~/.bashrc
+{% endif %}
+
+{% block environment -%}
+{% if conda_env -%}
+##### activate conda environment
+    conda deactivate
+    conda activate {{ conda_env }}
+{% endif %}
+{%- endblock %}
+
+{% block main -%}
+{% block command -%}
+{{ command }} {{ cli(args, indent=4) }}
+{% endblock -%}
+{% endblock -%}
+
+{% endblock %}

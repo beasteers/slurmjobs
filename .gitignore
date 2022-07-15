@@ -6,6 +6,7 @@ __pycache__/
 # mac
 .DS_Store
 
+docs/jobs/
 
 # trash folders
 shh/

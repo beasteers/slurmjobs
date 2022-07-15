@@ -1,0 +1,36 @@
+{% extends "job.base.j2" %}
+{% block header -%}
+{% block arguments -%}
+#SBATCH --job-name={{ job_id }}
+{%- if email %}
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user={{ email }}
+{%- endif %}
+{%- if dependency %}
+#SBATCH --dependency={{ dependency }}
+{%- endif %}
+#SBATCH --output={{ paths.output }}
+{% for key, val in sbatch.items() -%}
+{%- if val is not none -%}
+    #SBATCH --{{ key|replace('_', '-') }}={{ val }}
+{% endif %}
+{%- endfor %}
+{%- endblock %}
+
+{{ super() }}
+{%- endblock %}
+
+{% block body -%}
+{% block modules -%}
+{% if modules -%}
+##### Load Modules
+    module purge
+    {% for module in modules -%}
+        module load {{ module }}
+    {% endfor %}
+{% endif -%}
+{% endblock -%}
+
+{{ super() }}
+
+{% endblock -%}

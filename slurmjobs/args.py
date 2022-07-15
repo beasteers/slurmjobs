@@ -1,37 +1,25 @@
+'''Argument Formatters
 '''
-
-Argument Formatters
-
-'''
-from collections import namedtuple
 from . import util
+from . import grid
 
 
-DEFAULT_CLI = 'fire'
+class Argument:
+    '''The base-class for all argument formatters.
+    If you want to provide a new argument formatter, 
+    just override this class and change either the:
 
+     * ``format_arg`` method that is used to format positional and key-value pairs, or 
+     * ``format_value`` (which is called in ``format_arg``) to format python values as a string.
+       This is often some form of quoted repr or json formatting.
 
-NoArgVal = '((((SLURMJOBS: NO ARG VALUE))))'
-
-
-class Arg(namedtuple('Arg', 'key value format')):
-    def __new__(self, key, value=NoArgVal, format=True):
-        return super().__new__(self, key, value, format)
-
-
-class ArgGroup(namedtuple('Arg', 'args kwargs')):
-    def __new__(self, *a, **kw):
-        return super().__new__(self, a, kw)
-
-
-def flat_join(xs):
-    return ' '.join(str(x) for x in util.flatten(xs) if x)
-
-
-class Argument(util.Factory):
+    
+    '''
     prefix = suffix = ''
 
     @classmethod
     def get(cls, key='fire', *a, **kw):
+        '''Return an instance of an argument formatter, based on its name.'''
         # key=fire -> FireArgument, key=None -> Argument
         if not key:
             return cls
@@ -39,77 +27,128 @@ class Argument(util.Factory):
             return key
         if isinstance(key, type) and issubclass(key, cls):
             return key(*a, **kw)
-        return cls.__children__(suffix='argument').get(key.lower())(*a, **kw)
+        return util.subclass_lookup(cls, suffix='argument').get(key.lower())(*a, **kw)
 
-    def _format_args(self, *args, **kw):
-        args = [self.format_arg_or_group(v) for v in args]
-        kw = {k: self.format_arg_or_group(k, v) for k, v in kw.items()}
-        return args, kw
+    def _format_args(self, *a, **kw):
+        '''This prepares all arguments and returns them as positional and keyword arguments.
 
-    def build(self, cmd, *a, **kw):
+        The keyword arguments contain both the key and value flag, as applicable.
+        '''
+        if a and isinstance(a[0], grid._BaseGridItem):
+            a, kw = (a[0].positional + a[1:], dict(a[0], **kw))
+        a = [self.format_arg(v) for v in a]
+        kw = {k: self.format_arg(k, v) for k, v in kw.items()}
+        return a, kw
+
+    def __call__(self, *a, indent=None, **kw):
+        '''Format arguments as a string.
+        
+        Arguments:
+            *a: positional arguments for the CLI.
+            indent (int): The indentation (in spaces) for each argument. If
+                ``indent`` is ``None`` the arguments are inline, otherwise 
+                the arguments are each on their own line.
+            **kw: Keyword arguments for the CLI.
+
+        Returns:
+            str: The command-line arguments formatted and ready to be outputted
+                to a bash command.
+        '''
         a2, kw2 = self._format_args(*a, **kw)
-        values = {f'_{k}': v for k, v in dict(enumerate(a), **kw).items()}
-        all_ = flat_join([self.prefix] + a2 + list(kw2.values()) + [self.suffix])
-        return cmd.format(*a2, **kw2, __all__=all_, **values)
+        items = (
+            [self.prefix]*bool(self.prefix) + 
+            a2 + [x for xs in kw2.values() if xs for x in xs] + 
+            [self.suffix]*bool(self.suffix))
 
-    def build_args(self, *a, **kw):
-        return self.build('{__all__}', *a, **kw)
+        indent = '\\\n' + ' '*indent if indent is not None else ''
+        return ' '.join((
+            f'{indent}{" ".join(x) if isinstance(x, list) else x}' 
+            for x in items))
 
-    def format_arg_or_group(self, k, v=NoArgVal):
-        value = k if v is NoArgVal else v
-        if isinstance(value, ArgGroup):
-            return self.format_group(value)
-        if isinstance(value, Arg):
-            if not value.format:
-                return value.key if value.value is NoArgVal else value.value
-            k, v = value.key, value.value
-        return self.format_arg(k, v)
+    def format_arg(self, k, v=...):
+        '''Format a key-value pair for the command-line.
+        
+        If it is a positional argument, the value will be in key and the value
+        will be ``...``.
 
-    def format_group(self, v):
-        args, kw = self._format_args(*v.args, **v.kwargs)
-        return flat_join(args + list(kw.values()))
-
-    def format_arg(self, k, v=NoArgVal):
-        return self.format_value(k) if v is NoArgVal else self.format_value(v)
+        Arguments:
+            k: The key (or value, for positional arguments).
+            v: The value. If it's a positional argument, it will be ``v=...``
+        '''
+        return [self.format_value(k) if v is ... else self.format_value(v)]
 
     def format_value(self, v):
+        '''Format a value for the command-line.'''
         return util.shlex_repr(v)
 
 
 
 class FireArgument(Argument):
+    '''Argument formatting for Python Fire.
+
+    Example: ``python script.py a b --arg1 c --arg2 d``
+    
+    * Docs: https://google.github.io/python-fire/guide/
+    * Github: https://github.com/google/python-fire
+    '''
     kw_fmt = '--{key}={value}'
 
-    def format_arg(self, k, v=NoArgVal):
-        if v is NoArgVal:
-            return self.format_value(k)
-        return self.kw_fmt.format(key=k, value=self.format_value(v))
+    def format_arg(self, k, v=...):
+        if v is ...:
+            return [self.format_value(k)]
+        return [self.kw_fmt.format(key=k, value=self.format_value(v))]
 
 
 
 class ArgparseArgument(Argument):
+    '''Argument formatting for Python's builtin argparse.
+
+    Example: ``python script.py a b --arg1 c --arg2 d``
+    
+    * Docs: https://docs.python.org/3/library/argparse.html
+    '''
     short_opt, long_opt = '-', '--'
 
-    def format_arg(self, k, v=NoArgVal):
+    def format_arg(self, k, v=...):
+        if v is False:
+            return [self.format_key(f'no-{k}')]
         key = self.format_key(k)
-        if v is True or v is NoArgVal:
-            return key
-        if v is False or v is None:
-            return ''
+        if v is True or v is ...:
+            return [key]
+        if v is None:
+            return []
         if not isinstance(v, (list, tuple, set)):
             v = [v]
-        return [key] + [self.format_value(x) for x in v]
+        # this will all be joined to gether as strings. The extra
+        # list on the outside means that it will appear on the same line
+        # when indentation is requested
+        vs = [self.format_value(x) for x in v]
+        return [ [key] + vs ]
 
     def format_key(self, k):
         return '{}{}'.format(self.long_opt if len(k) > 1 else self.short_opt, k)
 
 
 class SacredArgument(FireArgument):
+    '''Formatting for sacred.
+
+    Example: ``python script.py with arg1=a arg2=b``
+    
+    * Docs: https://sacred.readthedocs.io/en/stable/
+    * Github: https://github.com/IDSIA/sacred
+    '''
     prefix = 'with'
     kw_fmt = '{key}={value}'
 
 
 class HydraArgument(FireArgument):
+    '''Formatting for hydra.
+
+    Example: ``python script.py  db.user=root db.pass=1234``
+    
+    * Docs: https://hydra.cc/docs/intro/
+    * Github: https://github.com/facebookresearch/hydra
+    '''
     kw_fmt = '{key}={value}'
     available_prefixes = ['+', '++', '~', '']
     # https://hydra.cc/docs/advanced/override_grammar/basic
@@ -122,11 +161,11 @@ class HydraArgument(FireArgument):
         self.kw_fmt_prefixed = default_prefix + self.kw_fmt
         super().__init__(**kw)
 
-    def format_arg(self, k, v=NoArgVal):
-        if v is NoArgVal:
-            return self.format_value(k)
+    def format_arg(self, k, v=...):
+        if v is ...:
+            return [self.format_value(k)]
         kw_fmt = (
             self.kw_fmt
             if any(k.startswith(pfx) for pfx in self.available_prefixes if pfx)
             else self.kw_fmt_prefixed)
-        return kw_fmt.format(key=k, value=self.format_value(v))
+        return [kw_fmt.format(key=k, value=self.format_value(v))]

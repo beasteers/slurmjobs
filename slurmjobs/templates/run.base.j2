@@ -2,16 +2,16 @@
 #########################
 #
 # Job Batch: {{ name }}
+{% if grid -%}
 # Params:
-{{ params|pprint|prefixlines('# ') }}
+{{ grid|comment }}
+{% endif -%}
 #
 #########################
 {% endblock %}
 
 {% block body %}
-{{ run_init_script }}
-
 {% for path in job_paths -%}
-    sbatch "{{ path }}"
+    . "{{ path }}"
 {% endfor %}
 {% endblock %}

@@ -1,0 +1,20 @@
+{% extends "job.base.j2" %}
+
+{% block main %}
+{# write script to a temp file so we can use it with nohup #}
+TMP_SCRIPT="__{{ job_id }}.tmp.sh"
+cat << EOF > $TMP_SCRIPT
+{% block command %}
+{{ super() }}
+{% endblock %}
+
+rm $TMP_SCRIPT
+EOF
+
+chmod +x "$TMP_SCRIPT"
+{% if background -%}
+    nohup "$TMP_SCRIPT" > {{ paths.output }} 2>&1 </dev/null &
+{% else -%}
+    . $TMP_SCRIPT
+{%- endif %}
+{% endblock %}

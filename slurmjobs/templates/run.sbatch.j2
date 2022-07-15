@@ -1,0 +1,7 @@
+{% extends "run.base.j2" %}
+
+{% block body %}
+{% for path in job_paths -%}
+    sbatch "{{ path }}"
+{% endfor %}
+{% endblock %}
