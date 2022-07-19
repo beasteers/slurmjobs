@@ -1,0 +1,14 @@
+{% block header %}
+#########################
+#
+# Job Batch: {{ name }}
+#
+#########################
+{% endblock %}
+
+{% block body %}
+{% for jid in job_ids -%}
+    . "{{ job_paths[jid] }}"
+{% endfor %}
+{% endblock %}
+
