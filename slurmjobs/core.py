@@ -20,6 +20,7 @@ import time
 import pprint
 import jinja2
 import pathtrees
+from typing import Dict, List, Any, Optional
 from .grid import *
 from . import util
 from .args import Argument
@@ -80,7 +81,7 @@ class Jobs:
 
 
     '''
-    options = {
+    options: Dict[str, Any] = {
         'email': None,
         'conda_env': None,
         'run_dir': None,
@@ -208,6 +209,11 @@ class Jobs:
         return job_id.replace(' ', '').replace('\n', '').replace('\t', '')
 
 
+    def get_valid_grid(self, grid_):
+        '''Returns valid grid object'''
+        return Grid.as_grid([{}] if grid_ is None else grid_)
+
+
     def generate(self, grid_=None, *a, ignore_job_id_keys=None, **kw):
         '''Generate slurm jobs for every combination of parameters.
         
@@ -225,7 +231,7 @@ class Jobs:
         '''
         # generate jobs
         # kw = dict(kw, **(kwargs_ or {})) # for taken keys.
-        grid = Grid.as_grid([{}] if grid_ is None else grid_)
+        grid = self.get_valid_grid(grid_)
 
         used = set()
         job_paths = []
