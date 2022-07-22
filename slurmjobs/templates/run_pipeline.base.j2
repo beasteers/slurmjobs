@@ -7,8 +7,10 @@
 {% endblock %}
 
 {% block body %}
-{% for jid in job_ids -%}
-    . "{{ job_paths[jid] }}"
+{% for group in job_groups -%}
+    {% for jid in group -%}
+        . "{{ job_id_to_path[jid] }}"
+    {% endfor %}
 {% endfor %}
 {% endblock %}
 

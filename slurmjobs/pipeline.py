@@ -1,25 +1,18 @@
 import itertools
 import time
-import jinja2
 import pathtrees
 from typing import List, Dict, Union, Optional
 from copy import deepcopy
+from toposort import toposort
 from . import util
-from toposort import toposort_flatten
-from .core import Jobs
+from .core import Jobs, env
 from .grid import BaseGrid, GridItem, GridItemBundle
-
-loader = jinja2.ChoiceLoader([
-    jinja2.PackageLoader('slurmjobs', 'templates')
-])
-env = jinja2.Environment(loader=loader)
-env.filters['prettyjson'] = util.prettyjson
-env.filters['prefixlines'] = util.prefixlines
-env.filters['pprint'] = pprint.pformat
-env.filters['comment'] = lambda x, ns=1, ch='#', nc=1: util.prefixlines(x, ch*nc+' '*ns)
 
 
 class PipelineTask:
+    allowed_job_id_chars: str = '_'
+    special_character_replacement: str = '_'
+
     def __init__(self,
         jobs: Jobs, grid: BaseGrid, *a,
         name: Optional[str] = None,
@@ -55,18 +48,28 @@ class PipelineTask:
     def get_job_id(self, params: GridItem):
         # let job itself take care of the job ID, the dependent params are
         # assumed to be passed
-        return self.jobs.format_job_id(
+        _job_id = self.jobs.format_job_id(
             params,
             params.grid_keys,
             name=self.name,
             ignore_keys=self.ignore_job_id_keys
         )
+        job_id = _job_id.strip()
+        # sanitize job_id so we can use them as environment variables
+        job_id = ''.join(
+            c if c in self.allowed_job_id_chars or c.isalnum() else self.special_character_replacement
+            for c in job_id
+        )
+        if job_id[0].isnumeric():
+            raise ValueError('Pipeline Job ID cannot begin with a number ({_job_id})')
+
+        return job_id
 
     def get_dependency_params_iter(self, dependency, name=None):
         """ Override if you want to do anything specific to the params
             before returning them or handle different kinds of dependencies
             differently"""
-        for job_id, params, dep_list in dependency.job_iter():
+        for job_id, params, dep_dict in dependency.job_iter():
             orig_params = params
             yield params, orig_params
 
@@ -99,12 +102,14 @@ class PipelineTask:
 
                 job_id = self.get_job_id(params)
 
-                dependency_job_ids = [
-                    dep.get_job_id(dep_grid_item)
-                    for dep, dep_grid_item in zip(dep_list, orig_dep_param_grids)
-                ]
+                dependency_job_dict = {}
+                for dep, dep_grid_item in zip(dep_list, orig_dep_param_grids):
+                    if dep.done_condition not in dependency_job_dict:
+                        dependency_job_dict[dep.done_condition] = []
+                    dep_job_id = dep.get_job_id(dep_grid_item)
+                    dependency_job_dict[dep.done_condition].append(dep_job_id)
 
-                yield (job_id, params, dependency_job_ids)
+                yield (job_id, params, dependency_job_dict)
 
 
 class Dependency:
@@ -161,6 +166,9 @@ class Dependency:
 class Pipeline:
     """ Pipeline object for creating pipelines """
 
+    run_template = '''{% extends 'run_pipeline.base.j2' %}
+    '''
+
     def __init__(self, name):
         self.name = name
         self.paths = self.get_paths()
@@ -212,35 +220,60 @@ class Pipeline:
             task.jobs.generate_job(job_id, _grid=task.grid, _args=params)
             for job_id, (task, params, _) in job_dict.items()
         }
-
-        # sort jobs topologically to get linearized order of jobs
+        
+        # get dependency map
         dependencies = {
-            job_id: set(deps) for job_id, (_, _, deps) in job_dict.items()
+            job_id: deps for job_id, (_, _, deps) in job_dict.items()
         }
-        ordered_job_ids = toposort_flatten(dependencies)
-        job_paths_list = [job_path_dict[job_id] for job_id in ordered_job_ids]
+
+        # sort jobs topologically to get linearized groupings of jobs
+        dependency_graph = {
+            job_id: set([d for lst in deps.values() for d in lst])
+            for job_id, deps in dependencies.items()
+        }
+        job_groups = list(toposort(dependency_graph))
 
         # generate run file
         run_script = self.generate_run_script(
-            ordered_job_ids, job_paths_list, dependencies)
+            job_groups, job_path_dict, dependencies
+        )
 
         # store the current timestamp
         if 'time_generated' in self.paths.paths:
             self.paths.time_generated.write_text(str(time.time()))
 
+        # create linear list of jobs to return
+        job_paths_list = [
+            job_path_dict[job_id]
+            for group in job_groups
+            for job_id in group
+        ]
         return run_script, job_paths_list
     
 
-    def generate_run_script(self, ordered_job_ids, _job_paths, _dependencies, **kw):
+    def generate_run_script(self, _job_groups, _job_id_to_path, _dependencies, **kw):
         """Generate a job run script that will submit all jobs."""
         # generate run script
         file_path = self.paths.run
         with open(file_path, "w") as f:
             f.write(env.from_string(self.run_template).render(
                 name=self.name,
-                job_ids=ordered_job_ids,
-                job_paths=_job_paths,
+                job_groups=_job_groups,
+                job_id_to_path=_job_id_to_path,
                 paths=self.paths,
                 dependencies=_dependencies, **kw))
         util.make_executable(file_path)
         return file_path
+
+
+class ParallelPipeline(Pipeline):
+    """ Pipeline object for creating pipelines where job groups are run in parallel """
+
+    run_template: str = '''{% extends 'run_pipeline.parallel.j2' %}
+    '''
+
+
+class SlurmPipeline(Pipeline):
+    """ Pipeline object for creating pipelines where job groups are run in parallel """
+    run_template: str = '''{% extends 'run_pipeline.slurm.j2' %}
+    '''

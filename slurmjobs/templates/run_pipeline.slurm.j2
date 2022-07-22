@@ -1,0 +1,15 @@
+{% extends "run_pipeline.base.j2" %}
+
+{% block body %}
+{% for group in job_groups %}
+    {%- for jid in group -%}
+        {{ jid }}=$( sbatch {% if dependencies[jid] %} --dependency=
+                {%- for dep_type, dep_list in dependencies[jid].items() -%}
+                    {{([dep_type] + dep_list) | join(":$")}}
+                    {%- if not loop.last -%},{%- endif -%}
+                {%- endfor -%}
+            {%- endif %} "{{ job_id_to_path[jid] }}" | rev | cut -d' ' -f 1 | rev)
+    {%- endfor %}
+{% endfor %}
+{% endblock %}
+
