@@ -8,9 +8,9 @@
 
 {% block body %}
 {% for group in job_groups -%}
-    {% for jid in group -%}
-        . "{{ job_id_to_path[jid] }}"
-    {% endfor %}
+{%- for jid in group %}
+. "{{ job_id_to_path[jid] }}"
+{%- endfor %}
 {% endfor %}
 {% endblock %}
 

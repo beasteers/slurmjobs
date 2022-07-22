@@ -2,11 +2,10 @@
 
 {% block body %}
 {% for group in job_groups -%}
-    {% for jid in group -%}
-        . "{{ job_id_to_path[jid] }}" &
-    {% endfor %}
-    wait
-    
+{%- for jid in group %}
+. "{{ job_id_to_path[jid] }}" &
+{%- endfor %}
+wait
 {% endfor %}
 {% endblock %}
 
