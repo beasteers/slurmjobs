@@ -1,3 +1,4 @@
+from calendar import c
 import itertools
 import time
 import pathtrees
@@ -115,8 +116,8 @@ class PipelineTask:
 class Dependency:
     def __init__(self,
         task: PipelineTask,
-        done_condition: str,
         reduce: bool = False,
+        done_condition: str = "completed",
         dependency_grid: Optional[BaseGrid] = None,
     ):
         self.task = task
@@ -143,7 +144,7 @@ class Dependency:
 
     def validate_terminate_condition(self, done_condition: str):
         """Override to perform validation on the conditions"""
-        if done_condition not in ('completed', 'failed', 'timeout'):
+        if done_condition != 'completed':
             raise ValueError(f'done_condition = {done_condition} is invalid')
 
     def validate_dependency_grid(self, dependency_grid: Optional[BaseGrid]):
@@ -180,10 +181,7 @@ class Pipeline:
         }}).update(name=self.name, **kw)
         return paths
 
-    def validate_task(self,
-        task: PipelineTask,
-        task_dict: Optional[Dict[str, PipelineTask]] = None
-    ):
+    def validate_task(self, task: PipelineTask):
         # make sure name is specified
         if not task.name:
             raise ValueError(
@@ -191,13 +189,11 @@ class Pipeline:
                 "object to use with a Pipeline"
             )
 
-        # make sure we don't have different Jobs objects with the same name
-        if task_dict and task.name in task_dict:
-            if task != task_dict[task.name]:
-                raise ValueError(
-                    f"Found different PipelineTask objects with the same name "
-                    f"({task.name}). PipelineTask names must be unique."
-                )
+        for dep in task.dependencies.values():
+            self.validate_dependency(dep)
+
+    def validate_dependency(self, dep: Dependency):
+        pass
 
     def get_task_grid_item(self, task: PipelineTask, grid_item):
         grid_item = deepcopy(grid_item)
@@ -209,6 +205,7 @@ class Pipeline:
         # get jobs, params, and dependencies
         job_dict = {}
         for task in tasks:
+            self.validate_task(task)
             for job_id, params, dependencies in task.job_iter():
                 # Make sure job_id doesn't already exist
                 if job_id in job_dict:
@@ -273,7 +270,33 @@ class ParallelPipeline(Pipeline):
     '''
 
 
+class SlurmDependency(Dependency):
+    """ Dependency for SLURM task """
+
+    def __init__(self,
+        task: PipelineTask,
+        reduce: bool = False,
+        done_condition: str = "afterany",
+        dependency_grid: Optional[BaseGrid] = None,
+    ):
+        super().__init__(
+            task, reduce=reduce,
+            done_condition=done_condition,
+            dependency_grid=dependency_grid
+        )
+
+    def validate_terminate_condition(self, done_condition: str):
+        """Override to perform validation on the conditions"""
+        if done_condition not in ('after', 'afterany', 'afterok', 'afternotok'):
+            raise ValueError(f'done_condition = {done_condition} is invalid')
+
+
 class SlurmPipeline(Pipeline):
     """ Pipeline object for creating pipelines where job groups are run in parallel """
+
     run_template: str = '''{% extends 'run_pipeline.slurm.j2' %}
     '''
+
+    def validate_dependency(self, dep: Dependency):
+        if not isinstance(dep, SlurmDependency):
+            raise ValueError("Dependencies must be an instance of SlurmDependency")
