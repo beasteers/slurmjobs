@@ -8,6 +8,7 @@ from toposort import toposort
 from . import util
 from .core import Jobs, env
 from .grid import BaseGrid, GridItem, GridItemBundle
+from .util import immutify
 
 
 class PipelineTask:
@@ -149,9 +150,16 @@ class Dependency:
 
     def validate_dependency_grid(self, dependency_grid: Optional[BaseGrid]):
         """Override to perform validation on the dependency grid"""
-        # TODO: check if grid is a subset of dependencies
-        # self.task
-        pass
+        if dependency_grid:
+            # TODO: this can probably be made more efficient
+            dep_items = set(immutify(list(dependency_grid)))
+            task_items = set(immutify(list(self.task.grid)))
+            if not dep_items.issubset(task_items):
+                raise ValueError(
+                    f"Dependency grid for {self.name} "
+                    f"must be a subset of the task dependencies"
+                )
+                
 
     def get_job_id(self, grid_item: GridItem):
         return self.task.get_job_id(grid_item)

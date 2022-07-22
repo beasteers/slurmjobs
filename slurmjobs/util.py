@@ -5,6 +5,7 @@ import shlex
 import types
 import itertools
 import collections
+from typing import (AnyStr, Dict, List, Set, Tuple, Union)
 
 
 
@@ -40,6 +41,17 @@ def command_to_name(command):
 def as_chunks(lst, n=1):
     return [lst[i:i + n] for i in range(0, len(lst), n)]
 
+
+def immutify(a : Union[AnyStr, Dict, float, int, List, Set, Tuple]):
+    # https://stackoverflow.com/a/54652440
+    if (isinstance(a, (int, str, frozenset))):
+        return a
+    elif (isinstance(a, (tuple, list))):
+        return tuple(immutify(elem) for elem in a)
+    elif (isinstance(a, set)):
+        return frozenset(immutify(elem) for elem in a)
+    elif (isinstance(a, dict)):
+        return tuple((immutify(k), immutify(v)) for k, v in a.items())
 
 
 def make_executable(file_path):
