@@ -289,6 +289,7 @@ class Jobs:
         '''Generate a job run script that will submit all jobs.'''
         # Generate run script
         file_path = self.paths.run
+        file_path.parent.mkdir(exist_ok=True)
         with open(file_path, "w") as f:
             f.write(env.from_string(self.run_template).render(
                 name=self.name,

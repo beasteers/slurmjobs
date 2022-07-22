@@ -1,4 +1,6 @@
-from calendar import c
+from __future__ import annotations
+from genericpath import exists
+# from calendar import c
 import itertools
 import time
 import pathtrees
@@ -42,7 +44,7 @@ class PipelineTask:
     def add_dependencies(self, dependencies, overwrite=False):
         dependencies = self._preprocess_dependencies(dependencies)
         for k, v in dependencies.items():
-            if not overwrite and k in self._dependencies:
+            if not overwrite and k in self.dependencies:
                 raise ValueError(f"Trying to add dependency with name '{k}', "
                                     "but it already exists")
             self.dependencies[k] = v
@@ -88,10 +90,10 @@ class PipelineTask:
     def job_iter(self, grid=None):
         """ Yield the params for each grid item"""
         grid = grid or self.grid
-        dep_list, dep_param_grid_iters, orig_dep_param_grid_iters = zip(*[
-            (dep,) + self.get_dependency_params_iter(dep, name=name)
+        dep_list, dep_param_grid_iters, orig_dep_param_grid_iters = tuple(zip(*[
+            (dep,) + tuple(zip(*self.get_dependency_params_iter(dep, name=name))) or ([], [])
             for name, dep in self.dependencies.items()
-        ])
+        ])) or ((), (), ())
 
         for grid_item in grid:
             for dep_param_grids, orig_dep_param_grids in zip(
@@ -177,7 +179,7 @@ class Pipeline:
 
     run_template = '''{% extends 'run_pipeline.base.j2' %}
     '''
-
+    root_dir = 'jobs'
     def __init__(self, name):
         self.name = name
         self.paths = self.get_paths()
@@ -214,7 +216,9 @@ class Pipeline:
         job_dict = {}
         for task in tasks:
             self.validate_task(task)
+            print('task:', task)
             for job_id, params, dependencies in task.job_iter():
+                print(job_id, params)
                 # Make sure job_id doesn't already exist
                 if job_id in job_dict:
                     raise RuntimeError(f"Duplicate job ID: {job_id}")
@@ -222,7 +226,7 @@ class Pipeline:
 
         # generate job files
         job_path_dict = {
-            task.jobs.generate_job(job_id, _grid=task.grid, _args=params)
+            job_id: task.jobs.generate_job(job_id, _grid=task.grid, _args=params)
             for job_id, (task, params, _) in job_dict.items()
         }
         
@@ -260,6 +264,7 @@ class Pipeline:
         """Generate a job run script that will submit all jobs."""
         # generate run script
         file_path = self.paths.run
+        file_path.parent.mkdir(exist_ok=True)
         with open(file_path, "w") as f:
             f.write(env.from_string(self.run_template).render(
                 name=self.name,
