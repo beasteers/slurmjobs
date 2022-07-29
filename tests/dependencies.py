@@ -10,7 +10,7 @@ grid1 = sj.Grid([('a', [1, 2]), ('b', [3, 4])])
 # breaks
 grid2 = sj.Grid([('c', [1, 2]), ('b', [3, 4])])
 # works
-grid2 = sj.Grid([('c', [1, 2])])
+# grid2 = sj.Grid([('c', [1, 2])])
 
 grid3 = sj.Grid([('f', [1, 2])])
 
