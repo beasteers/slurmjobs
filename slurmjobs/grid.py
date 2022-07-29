@@ -387,6 +387,18 @@ class GridItem(_BaseGridItem):
         if key in self.grid_keys:
             self.grid_keys.remove(key)
 
+    @classmethod
+    def as_grid_item(cls, item):
+        '''Ensure that a value is a grid.'''
+        if isinstance(item, GridItem):
+            return item
+        if isinstance(item, dict):
+            return GridItem(
+                grid=item,
+                keys=tuple(item.keys()),
+            )
+        return GridItem(item)
+
     
 
 class GridItemBundle(_BaseGridItem):
