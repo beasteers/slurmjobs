@@ -1,10 +1,8 @@
 from __future__ import annotations
-from genericpath import exists
-# from calendar import c
 import itertools
 import time
 import pathtrees
-from typing import List, Dict, Union, Optional
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 from copy import deepcopy
 from toposort import toposort
 from . import util
@@ -21,7 +19,8 @@ class PipelineTask:
         jobs: Jobs, grid: BaseGrid, *a,
         name: Optional[str] = None,
         ignore_job_id_keys: Optional[List[str]] = None,
-        dependencies: Optional[Union[List[Dependency], Dict[str, Dependency]]] = None, **kw
+        dependencies: Optional[Union[List[Dependency], Dict[str, Dependency]]] = None,
+        **kw
     ):
         # Basically wraps the arguments that would be passed to jobs.generate()
         self.jobs = jobs
@@ -69,13 +68,14 @@ class PipelineTask:
 
         return job_id
 
-    def get_dependency_params_iter(self, dependency, name=None):
+    def get_dependency_params_iter(self, dependency, name=None) -> Iterator[Tuple[GridItem, Union[GridItem, Tuple[GridItem, ...]]]]:
         """ Override if you want to do anything specific to the params
             before returning them or handle different kinds of dependencies
             differently"""
         for job_id, params, dep_dict in dependency.job_iter():
             orig_params = params
             yield params, orig_params
+        # For reduction tasks, yield tuple of orig_params for all of the tasks
 
     def get_dependency_job_ids(self):
         return [
@@ -91,7 +91,7 @@ class PipelineTask:
         """ Yield the params for each grid item"""
         grid = grid or self.grid
         dep_list, dep_param_grid_iters, orig_dep_param_grid_iters = tuple(zip(*[
-            (dep,) + tuple(zip(*self.get_dependency_params_iter(dep, name=name))) or ([], [])
+            (dep,) + tuple(zip(*self.get_dependency_params_iter(dep, name=name))) or ((), ())
             for name, dep in self.dependencies.items()
         ])) or ((), (), ())
 
@@ -100,7 +100,7 @@ class PipelineTask:
                 itertools.product(*dep_param_grid_iters),
                 itertools.product(*orig_dep_param_grid_iters)
             ):
-                params = GridItemBundle(grid_item, *dep_param_grids)
+                params = GridItemBundle(*reversed(dep_param_grids), grid_item)
                 params.positional += self.a
                 params.update(self.kw)
 
@@ -110,8 +110,18 @@ class PipelineTask:
                 for dep, dep_grid_item in zip(dep_list, orig_dep_param_grids):
                     if dep.done_condition not in dependency_job_dict:
                         dependency_job_dict[dep.done_condition] = []
-                    dep_job_id = dep.get_job_id(dep_grid_item)
-                    dependency_job_dict[dep.done_condition].append(dep_job_id)
+
+                    if not isinstance(dep_grid_item, tuple):
+                        # Sequential case: this job takes a single job as input
+                        dep_grid_item_list = (dep_grid_item,)
+                    else:
+                        # Reduction case: this job takes multiple jobs as input
+                        dep_grid_item_list = dep_grid_item
+
+                    # Account for all dependent jobs
+                    for _dep_grid_item in dep_grid_item_list:
+                        dep_job_id = dep.get_job_id(_dep_grid_item)
+                        dependency_job_dict[dep.done_condition].append(dep_job_id)
 
                 yield (job_id, params, dependency_job_dict)
 
