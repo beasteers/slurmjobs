@@ -2,7 +2,24 @@
 Changes
 =============
 
-Unreleased
+
+1.1.0
+-------------
+ - added singuconda binary to the scripts
+ - broke down `format_id_item` into `format_id_key` and `format_id_value` for easier overriding
+   - added better formattting for dicts, lists, and tuples
+ - job ID allowed character replacement applies to the whole job ID once it's formatted
+   - added `+=` as allowed job chars
+ - `Grid.as_grid(None)` returns a grid with a single empty entry
+ - overlay and sif are now enforced to have a value (not sure why this wasn't the default before)
+ - experimental ``GridFilter`` class added to allow filtering using functions (``e.g. grid | (lambda d: d if d['x'] != 5 else None)``)
+
+Minor Changes
+ - Fixed Argument.get return type to avoid confusing type errors - no longer returns the class if key is empty
+ - Fixed receipt and Grid typing errors
+
+
+1.0.0
 -------------
 
  - Rewrote like 70% of the code, including: jinja templates, jobs base class and subclasses
