@@ -1,9 +1,11 @@
+from __future__ import annotations
 import os
 import time
 import hashlib
 import functools
 import pprint
 import json
+from typing import Callable
 
 
 class Receipt:
@@ -40,7 +42,7 @@ class Receipt:
     '''
     ROOT_DIR = './receipts'
     TEST = False
-    def __init__(self, name='', *a, receipt_id=None, __dir__=None, **kw):
+    def __init__(self, name: str|Callable='', *a, receipt_id=None, __dir__=None, **kw):
         if callable(name):
             name = getattr(name, '__qualname__') or getattr(name, '__name__')
         assert name or a or kw, 'you must pass some identifiable information to be used for a hash.'
@@ -81,15 +83,15 @@ class Receipt:
             os.remove(self.fname)
 
     @property
-    def meta(self):
+    def meta(self) -> dict:
         if os.path.isfile(self.fname):
             with open(self.fname, 'r') as f:
+                s = f.read()
                 try:
-                    s = f.read()
                     return json.loads(s) if s else {}
                 except json.decoder.JSONDecodeError as e:
                     print('error:', e, s)
-                    return s
+        return {}
 
 
 
@@ -177,7 +179,6 @@ Skipping.
 
 # so that setting attributes will set receipt instead
 class _DeprecatedSetAttr:
-    func = None
     def __init__(self, func):
         self.func = func
         functools.update_wrapper(self, func)
