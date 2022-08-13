@@ -80,7 +80,7 @@ class Jobs:
 
 
     '''
-    options = {
+    options: dict = {
         'email': None,
         'conda_env': None,
         'run_dir': None,
@@ -99,7 +99,8 @@ class Jobs:
     job_id_arg = 'job_id'
     job_id_key_sep = '-'
     job_id_item_sep = ','
-    allowed_job_id_chars = ',._-'
+    job_id_iter_sep = '+'
+    allowed_job_id_chars = ',._-+='
     special_character_replacement = ''
     omit_missing_keys_from_job_id = True
     
@@ -145,6 +146,29 @@ class Jobs:
                 assert os.path.abspath(str(self.paths.batch_dir)) != '/', "Ummmmm..... what do you think you're doing... rm -rf / ???"
                 shutil.rmtree(str(self.paths.batch_dir))
 
+    def format_id_key(self, k):
+        '''Format a key in the job ID so it looks nicer. Override this to 
+        provide more sophisticated formatting.
+        '''
+        # key formatting
+        if k in self.key_abbreviations:
+            k = self.key_abbreviations[k]
+        elif self.abbreviate_length:
+            k = k[:self.abbreviate_length]
+        return k
+
+    def format_id_value(self, v):
+        '''Format a value in the job ID so it looks nicer. Override this to 
+        provide more sophisticated formatting.
+        '''
+        if isinstance(v,  (list, tuple)):
+            return self.job_id_iter_sep.join(self.format_id_value(vi) for vi in v)
+        if isinstance(v,  dict):
+            return self.job_id_iter_sep.join(self.format_id_item(ki, vi) for ki, vi in v.items())
+        if self.float_precision is not None and isinstance(v, float):
+            return f'{v:.{self.float_precision}g}'
+        return v
+
     def format_id_item(self, k, v):
         '''Formats a key-value pair for the job ID. 
 
@@ -153,7 +177,7 @@ class Jobs:
 
         Arguments:
             k (str): The argument key.
-            value (any): The argument value.
+            v (any): The argument value.
 
         Returns:
             Return a tuple if you want it to be joined using ``job_id_key_sep``. Return a string
@@ -162,20 +186,9 @@ class Jobs:
         Be warned that omitting key/value pairs runs the risk of filename collisions which will mean 
         multiple jobs overwritting each other in the same file.
         '''
-        # key formatting
-        if k in self.key_abbreviations:
-            k = self.key_abbreviations[k]
-        elif self.abbreviate_length:
-            k = k[:self.abbreviate_length]
-        # TODO do before abbreviate_length
-        k = ''.join(
-            c if c in self.allowed_job_id_chars or c.isalnum() else self.special_character_replacement
-            for c in k)
-
-        # value formatting
-        if self.float_precision is not None and isinstance(v, float):
-            v = f'{v:.{self.float_precision}g}'
-        return k, v
+        k = self.format_id_key(k)
+        v = self.format_id_value(v)
+        return f'{k}{self.job_id_key_sep}{v}'
 
     def format_job_id(self, args, keys=None, name=None, ignore_keys=None):
         '''Convert a dictionary to a job ID.
@@ -191,22 +204,23 @@ class Jobs:
         # format each key
         parts = []
         keys = getattr(args, 'grid_keys', args) if keys is None else keys
-        if ignore_keys:
-            keys = (k for k in keys if k not in ignore_keys)
-        for k in keys:
-            if k not in args:
-                if self.omit_missing_keys_from_job_id:
-                    continue
+        for k in keys or ():
+            if ignore_keys and k in ignore_keys:
+                continue
+            if self.omit_missing_keys_from_job_id and k not in args:
+                continue
             formatted = self.format_id_item(k, args.get(k))
-            if isinstance(formatted, (list, tuple)):
-                parts.append(self.job_id_key_sep.join(map(str, formatted)))
-            elif formatted is not None:
-                parts.append(str(formatted))
+            if formatted is None or formatted == '':
+                continue
+            parts.append(formatted)
 
         # join them together
         job_id = self.job_id_item_sep.join(map(str, [name]*bool(name) + parts))
-        return job_id.replace(' ', '').replace('\n', '').replace('\t', '')
-
+        job_id = job_id.replace(' ', '').replace('\n', '').replace('\t', '')
+        job_id = ''.join(
+            c if c in self.allowed_job_id_chars or c.isalnum() else self.special_character_replacement
+            for c in job_id)
+        return job_id
 
     def generate(self, grid_=None, *a, ignore_job_id_keys=None, **kw):
         '''Generate slurm jobs for every combination of parameters.
@@ -225,7 +239,7 @@ class Jobs:
         '''
         # generate jobs
         # kw = dict(kw, **(kwargs_ or {})) # for taken keys.
-        grid = Grid.as_grid([{}] if grid_ is None else grid_)
+        grid = Grid.as_grid(grid_)
 
         used = set()
         job_paths = []
@@ -295,7 +309,7 @@ class Jobs:
         util.make_executable(file_path)
         return file_path
 
-    def get_paths(self, **kw):
+    def get_paths(self, **kw) -> pathtrees.Paths:
         paths = pathtrees.tree(self.root_dir, {'{name}': {
             '': 'batch_dir',
             '{job_id}.job.sh': 'job',
@@ -304,7 +318,7 @@ class Jobs:
             'output/{job_id}.log': 'output',
             'time_generated': 'time_generated',
         }}).update(name=self.name, **kw)
-        return paths
+        return paths  # type: ignore
 
 
 
@@ -400,7 +414,7 @@ class Slurm(Jobs):
         super().__init__(*a, modules=modules, sbatch=sbatch, **kw)
 
         # handle n_cpus n_gpus
-        sbatch = self.options['sbatch']
+        sbatch: dict = self.options['sbatch']
         n_cpus = n_cpus if n_cpus is not None else sbatch.pop('n_cpus', None)
         n_gpus = n_gpus if n_gpus is not None else sbatch.pop('n_gpus', None)
         gres = sbatch.get('gres')
@@ -469,11 +483,16 @@ class Singularity(Slurm):
     )
     template = '''{% extends 'job.singularity.j2' %}
     '''
-    def __init__(self, command, overlay=None, sif=None, *a, **kw):
-        if overlay is not None:
-            kw['overlay'] = overlay
-        if sif is not None:
-            kw['sif'] = sif
-        super().__init__(command, *a, **kw)
-        self.options['sif'] = self.options['sif'] and os.path.join(
-            self.sif_dir, self.options['sif'])
+    def __init__(self, command, overlay, sif, *a, **kw):
+        assert overlay, 'You must specify an overlay file'
+        assert sif, 'You must specify a sif file'
+        super().__init__(command, *a, overlay=overlay, sif=sif, **kw)
+        self.options['sif'] = _inferred_root(self.options['sif'], self.sif_dir)
+
+
+def _inferred_root(fname, root):
+    if root and not os.path.isfile(fname):
+        alt = os.path.join(root, fname)
+        if os.path.isfile(alt):
+            fname = alt
+    return fname
