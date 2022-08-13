@@ -18,16 +18,13 @@ class Argument:
     prefix = suffix = ''
 
     @classmethod
-    def get(cls, key='fire', *a, **kw):
+    def get(cls, key='fire', *a, **kw) -> 'Argument':
         '''Return an instance of an argument formatter, based on its name.'''
-        # key=fire -> FireArgument, key=None -> Argument
-        if not key:
-            return cls
         if isinstance(key, cls):
             return key
         if isinstance(key, type) and issubclass(key, cls):
             return key(*a, **kw)
-        return util.subclass_lookup(cls, suffix='argument').get(key.lower())(*a, **kw)
+        return util.subclass_lookup(cls, suffix='argument')[key.lower()](*a, **kw)
 
     def _format_args(self, *a, **kw):
         '''This prepares all arguments and returns them as positional and keyword arguments.
