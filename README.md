@@ -23,10 +23,14 @@ pip install slurmjobs
 ## Usage
 
 ```python
+import os
 import slurmjobs
 
 jobs = slurmjobs.Singularity(
-    'python train.py', email='me@nyu.edu',
+    'python train.py', 
+    'overlay-5GB-200K.ext3',
+    'cuda11.0-cudnn8-devel-ubuntu18.04.sif',
+    email=f'{os.getenv("USER")}@nyu.edu',
     template='''{% extends 'job.singularity.j2' %}
   
 {% block main %}
