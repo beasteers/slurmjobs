@@ -36,6 +36,7 @@ This lets you do basic grid expansion and grid arithmetic.
 '''
 import itertools
 import collections
+from typing import Any, Iterator, Tuple
 
 # Parameter Grids
 
@@ -59,7 +60,7 @@ class BaseGrid:
 
     def __repr__(self):
         '''A nice string representation of the grid.'''
-        return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr(self.grid))))
+        return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr, self.grid)))
 
     def __str__(self):
         ''''''  # NOTE: not sure if this should be different or if we should switch str/repr
@@ -73,7 +74,7 @@ class BaseGrid:
         '''
         raise NotImplemented
 
-    def __iter__(self):
+    def __iter__(self) -> 'Iterator[_BaseGridItem]':
         '''Yield all combinations from the parameter grid.'''
         raise NotImplemented
 
@@ -81,13 +82,23 @@ class BaseGrid:
         '''Combine two parameter grids sequentially.'''
         return GridChain(self, other)
 
+    def __sub__(self, other):
+        '''Subtract two parameter grids.'''
+        return GridOmission(self, other)
+
     def __mul__(self, other):
         '''Create a grid as the combination of two grids.'''
         return GridCombo(self, other)
 
+    def __or__(self, other):
+        '''Apply a function to filter a grid.'''
+        return GridFilter(self, other)
+
     @classmethod
-    def as_grid(cls, grid):
+    def as_grid(cls, grid) -> 'BaseGrid':
         '''Ensure that a value is a grid.'''
+        if grid is None:
+            grid = [{}]
         if isinstance(grid, BaseGrid):
             return grid
         if isinstance(grid, (list, tuple)):
@@ -191,7 +202,7 @@ class Grid(BaseGrid):
     '''
     _is_expandable = False
     _easy_access_nested = False
-    def __init__(self, __grid, name=None, **constants):
+    def __init__(self, __grid, *, name=None, **constants):
         self.grid = list(__grid.items()) if isinstance(__grid, dict) else __grid
         super().__init__(name, **constants)
 
@@ -247,7 +258,7 @@ class Grid(BaseGrid):
             if k == name:
                 grid[i] = k, value
                 return True
-        if self.is_expandable:
+        if self._is_expandable:
             grid.append((name, value))
             return True
         return False
@@ -353,7 +364,8 @@ class LiteralGrid(BaseGrid):
 
 
 class _BaseGridItem(dict):
-    positional = ()
+    grid_keys: list = []
+    positional: Tuple[Any, ...] = ()
     # def variant_items(self):
     #     return [(k, self[k]) for k in self.grid_keys]
 
@@ -531,7 +543,57 @@ class GridOmission(BaseGrid):
                 yield d
 
 
+class GridFilter(BaseGrid):
+    '''This applies a filter function to a grid and can allow you to 
+    filter out, modify, or expand grid items.
 
+    You can create this doing ``grid_a | lambda d: d``.
+    
+    .. code-block:: python
+
+        a = Grid(('a', [1, 2]), ('b', [1, 2]))
+
+        # functionally equivalent:
+
+        filter_grid = lambda d: d if d['a'] != 2 and d['b'] != 2 else s
+
+        # simplest
+        c = a | filter_grid
+        # alternate definition
+        c = GridFilter(a, filter_grid)
+        # manual filtering
+        c = [d for d in (filter_grid(d) for d in a) if d is not None]
+
+        assert list(c) == [
+            {'a': 1, 'b': 1},
+            {'a': 1, 'b': 2},
+            {'a': 2, 'b': 1},
+        ]
+    '''
+    def __init__(self, grid, filter, name=None):
+        assert callable(filter), f"filter must be a function, not {type(filter)}"
+        self.grid = grid
+        self.filter = filter
+        super().__init__(name)
+   
+    def __len__(self):
+        return sum(1 for d in self)
+
+    def __iter__(self):
+        for do in self.grid:
+            d = self.filter(do)
+            # allow filter func to accept bools
+            if d is True:
+                d = do
+            # list-like/generator
+            if isinstance(d, (list, tuple)) or (hasattr(d,'__iter__') and not hasattr(d,'__len__')):
+                yield from d
+            elif d is not None:
+                yield d
+
+
+# def is_subset_dict(bigger, subset):
+#     return all(k in bigger for k in subset) and all(bigger[k] == subset[k] for k in subset)
 
 
 def prod(ns):
