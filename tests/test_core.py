@@ -19,7 +19,7 @@ def test_basic():
     EMAIL = 'bea.steers@gmail.com'
 
     with pytest.raises(TypeError):
-        batcher = slurmjobs.Slurm(
+        jobs = slurmjobs.Slurm(
             COMMAND, email=EMAIL,
             root_dir=os.path.join(ROOT, 'slurm'),
             conda_env=CONDA_ENV,
@@ -27,33 +27,33 @@ def test_basic():
             backup=False)
 
     # set batch parameters
-    batcher = slurmjobs.Slurm(
+    jobs = slurmjobs.Slurm(
         COMMAND, email=EMAIL,
         root_dir=os.path.join(ROOT, 'slurm'),
         conda_env=CONDA_ENV,
         modules=['cuda9'],
         sbatch={'n_gpus': 2},
         backup=False)
-    assert batcher.name == NAME
+    assert jobs.name == NAME
 
-    print(batcher.options['sbatch'])
-    # assert batcher.options['sbatch']['cpus-per-task'] == 2
-    assert batcher.options['sbatch']['gres'] == 'gpu:2'
+    print(jobs.options['sbatch'])
+    # assert jobs.options['sbatch']['cpus-per-task'] == 2
+    assert jobs.options['sbatch']['gres'] == 'gpu:2'
 
-    assert all(m in batcher.options['modules'] for m in batcher.module_presets['cuda9'])
+    assert all(m in jobs.options['modules'] for m in jobs.module_presets['cuda9'])
 
     # generate scripts
-    run_script, job_paths = batcher.generate([
+    run_script, job_paths = jobs.generate([
         ('kernel_size', [2, 3, 5]),
         ('nb_stacks', [1, 2]),
         ('lr', [1e-4, 1e-3]),
-    ], receptive_field=6)#, dependency=lambda d: batcher.format_job_id(d, name='prepare-xxxxxx')
+    ], receptive_field=6)#, dependency=lambda d: jobs.format_job_id(d, name='prepare-xxxxxx')
     job_paths = [str(p) for p in job_paths]
     print(run_script, job_paths)
     assert len(job_paths) == 2 * 2 * 3
 
     # check job files
-    found_job_paths = batcher.paths.job.glob()
+    found_job_paths = jobs.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
     job_content = pathtrees.Path(job_paths[0]).read_text()
     print(job_content)
@@ -61,11 +61,11 @@ def test_basic():
     assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV, EMAIL))#, '--dependency', 'prepare-xxxxxx'
 
     # check run file
-    run_content = batcher.paths.run.read_text()
+    run_content = jobs.paths.run.read_text()
     assert all(path in run_content for path in job_paths)
 
     # test single generate
-    run_script, job_paths = batcher.generate(receptive_field=6)
+    run_script, job_paths = jobs.generate(receptive_field=6)
     print(run_script, job_paths)
     assert len(job_paths) == 1
 
@@ -75,13 +75,13 @@ def test_shell():
     CONDA_ENV = 'dfakjsdfhajkh43981hrt4138r91gh4'
 
     # set batch parameters
-    batcher = slurmjobs.Shell(
+    jobs = slurmjobs.Shell(
         COMMAND, root_dir=os.path.join(ROOT, 'shell'),
         conda_env=CONDA_ENV, backup=False)
-    assert batcher.name == NAME
+    assert jobs.name == NAME
 
     # generate scripts
-    run_script, job_paths = batcher.generate([
+    run_script, job_paths = jobs.generate([
         ('kernel_size', [2, 3, 5]),
         ('nb_stacks', [1, 2]),
         ('lr', [1e-4, 1e-3]),
@@ -90,13 +90,13 @@ def test_shell():
     print(run_script, job_paths)
 
     # check job files
-    found_job_paths = batcher.paths.job.glob()
+    found_job_paths = jobs.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
     job_content = pathtrees.Path(job_paths[0]).read_text()
     assert all(x in job_content for x in (NAME, COMMAND, CONDA_ENV))
 
     # check run file
-    run_content = batcher.paths.run.read_text()
+    run_content = jobs.paths.run.read_text()
     assert all(path in run_content for path in job_paths)
 
 
@@ -106,27 +106,30 @@ def test_sing(n_gpus):
     COMMAND = 'python /some/thing.py train'
     CONDA_ENV = 'dfakjsdfhajkh43981hrt4138r91gh4'
     MEM = '33GB'
+    OVERLAY = 'overlay-5GB-200K.ext3'
+    SIF = 'cuda11.0-cudnn8-devel-ubuntu18.04.sif'
 
     # set batch parameters
-    batcher = slurmjobs.Singularity(
-        COMMAND, root_dir=os.path.join(ROOT, 'sing'), name=NAME,
+    jobs = slurmjobs.Singularity(
+        COMMAND, OVERLAY, SIF,
+        root_dir=os.path.join(ROOT, 'sing'), name=NAME,
         conda_env=CONDA_ENV, backup=False, n_gpus=n_gpus,
         sbatch=dict(mem=MEM))
-    assert batcher.name == NAME
+    assert jobs.name == NAME
 
-    print(batcher.options)
+    print(jobs.options)
 
     # generate scripts
-    run_script, job_paths = batcher.generate([
+    run_script, job_paths = jobs.generate([
         ('kernel_size', [2, 3, 5]),
         ('nb_stacks', [1, 2]),
         ('lr', [1e-4, 1e-3]),
-    ], receptive_field=6) #, dependency=lambda d: batcher.format_job_id(d, name='prepare-xxxxxx')
+    ], receptive_field=6) #, dependency=lambda d: jobs.format_job_id(d, name='prepare-xxxxxx')
     job_paths = [str(p) for p in job_paths]
     print(run_script, job_paths)
 
     # check job files
-    found_job_paths = batcher.paths.job.glob()
+    found_job_paths = jobs.paths.job.glob()
     assert set(job_paths) == set(found_job_paths)
     job_content = pathtrees.Path(job_paths[0]).read_text()
     for x in (NAME, COMMAND, CONDA_ENV):
@@ -138,7 +141,7 @@ def test_sing(n_gpus):
     #, '--dependency', 'prepare-xxxxxx'
 
     # check run file
-    run_content = batcher.paths.run.read_text()
+    run_content = jobs.paths.run.read_text()
     assert all(path in run_content for path in job_paths)
 
 
@@ -229,16 +232,16 @@ def test_arg_format():
 #     print('fire', cmd)
 #     assert cmd == EXPECTED
 
-#     batcher = slurmjobs.SlurmBatch(
+#     jobs = slurmjobs.SlurmBatch(
 #         CMD, name='blah', root_dir=os.path.join(ROOT, 'slurm'),
 #         multicmd=True, backup=False)
 
 #     # generate scripts
-#     run_script, job_paths = batcher.generate(**kwargs)
+#     run_script, job_paths = jobs.generate(**kwargs)
 #     print(run_script, job_paths)
 
 #     # check job files
-#     found_job_paths = batcher.paths.job.glob()
+#     found_job_paths = jobs.paths.job.glob()
 #     assert set(job_paths) == set(found_job_paths)
 #     job_content = pathtree.Path(job_paths[0]).read_text()
 #     print(job_content)
