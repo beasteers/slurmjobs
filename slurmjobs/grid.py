@@ -76,7 +76,7 @@ class BaseGrid:
 
     def __iter__(self) -> 'Iterator[_BaseGridItem]':
         '''Yield all combinations from the parameter grid.'''
-        raise NotImplemented
+        raise NotImplementedError
 
     def __add__(self, other):
         '''Combine two parameter grids sequentially.'''

@@ -414,22 +414,22 @@ class Slurm(Jobs):
         super().__init__(*a, modules=modules, sbatch=sbatch, **kw)
 
         # handle n_cpus n_gpus
-        sbatch: dict = self.options['sbatch']
-        n_cpus = n_cpus if n_cpus is not None else sbatch.pop('n_cpus', None)
-        n_gpus = n_gpus if n_gpus is not None else sbatch.pop('n_gpus', None)
-        gres = sbatch.get('gres')
+        sbat: dict = self.options['sbatch']
+        n_cpus = n_cpus if n_cpus is not None else sbat.pop('n_cpus', None)
+        n_gpus = n_gpus if n_gpus is not None else sbat.pop('n_gpus', None)
+        gres = sbat.get('gres')
         if n_cpus:
-            if sbatch.get('cpus-per-task'):
+            if sbat.get('cpus-per-task'):
                 raise ValueError("n_cpus specified as well as cpus-per-task")
-            sbatch['cpus-per-task'] = n_gpus or 1 if n_cpus is None else n_cpus
+            sbat['cpus-per-task'] = n_gpus or 1 if n_cpus is None else n_cpus
         if n_gpus:
-            if sbatch.get('gres'):
+            if sbat.get('gres'):
                 raise ValueError("n_gpus specified as well as gres. Please choose one or the other.")
-            sbatch['gres'] = f'gpu:{n_gpus or 0}'
+            sbat['gres'] = f'gpu:{n_gpus or 0}'
             # sbatch['gpus-per-task'] = n_gpus or 0
         if gres and isinstance(gres, int):
-            sbatch['gres'] = f'gpu:{gres}'
-        self.options['nv'] = bool(n_gpus or sbatch.get('gres')) if nv is None else nv
+            sbat['gres'] = f'gpu:{gres}'
+        self.options['nv'] = bool(n_gpus or sbat.get('gres')) if nv is None else nv
 
     def get_paths(self, **kw):
         paths = pathtrees.tree(self.root_dir, {'{name}': {
