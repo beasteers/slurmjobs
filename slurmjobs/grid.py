@@ -32,6 +32,41 @@ This lets you do basic grid expansion and grid arithmetic.
         {'a': 10, 'b': 10, 'c': 6},
     ]
 
+You can also use grids with positional arguments.
+
+Here's how you can take a folder of files, divide them into chunks, and run each
+chunk in a job.
+
+.. code-block:: python
+
+    # get file list in chunks
+    chunk = 50
+    files = glob.glob('*.mp4')
+    chunked_files = [files[i:i + chunk] for i in range(0, len(files), chunk)]
+
+    g = Grid([
+        # kwargs
+        ('win_size', [1, 5, 8]),
+        # positional arguments
+        ('*', chunked_files),
+    ], name='train')
+
+    # grid items act as dicts with all kwargs in them
+    assert list(g) == [
+        *[{'win_size': 1} for _ in chunked_files],
+        *[{'win_size': 5} for _ in chunked_files],
+        *[{'win_size': 8} for _ in chunked_files],
+    ]
+
+    # but you can access positional arguments like this
+    assert [gi.positional for gi in g] == [
+        # (one per window size)
+        *chunked_files
+        *chunked_files
+        *chunked_files
+    ]
+
+
 
 '''
 import itertools
@@ -364,29 +399,31 @@ class LiteralGrid(BaseGrid):
 
 
 class _BaseGridItem(dict):
+    name = None
     grid_keys: list = []
     positional: Tuple[Any, ...] = ()
     # def variant_items(self):
     #     return [(k, self[k]) for k in self.grid_keys]
 
-
-class GridItem(_BaseGridItem):
-    '''Represents a dictionary of arguments, the keys that vary, 
-    and a name for the group of args.
-    '''
-    def __init__(self, grid=None, keys=(), name=None, positional=(), ignore_keys=None):
-        if ignore_keys:
-            keys = [k for k in keys if k not in ignore_keys]
-        self.grid_keys = list(keys or ())
-        self.name = name
-        self.positional = positional or ()
+    def __init__(self, grid, name=None):
         super().__init__(() if grid is None else grid)
+        self.name = name
 
-    def __getitem__(self, key):
-        return super().__getitem__(key)
+    def _get_keys(self, keys=None, ignore_keys=None):
+        if keys is None:
+            keys = [k for k in self if not k.startswith('_')]
+        if ignore_keys:
+            keys = (k for k in (keys or ()) if k not in ignore_keys)
+        return unique(keys or ())
 
-    def find(self, name):
-        return self if self.name == name else None
+    def __getattr__(self, key):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            raise AttributeError(key)
+
+    # def __getitem__(self, key):
+    #     return super().__getitem__(key)
 
     def pop(self, key, *a, **kw):
         x = super().pop(key, *a, **kw)
@@ -399,7 +436,25 @@ class GridItem(_BaseGridItem):
         if key in self.grid_keys:
             self.grid_keys.remove(key)
 
-    
+    def find(self, name):
+        return self if self.name == name else None
+
+
+class GridItem(_BaseGridItem):
+    '''Represents a dictionary of arguments, the keys that vary, 
+    and a name for the group of args.
+    '''
+    def __init__(self, grid=None, keys=(), name=None, positional=(), ignore_keys=None):
+        super().__init__(grid, name)
+        # get varargs from grid
+        self.positional = tuple(positional or ()) + tuple(super().pop('*', None) or ())
+        kwargs = super().pop('**', None)
+        # get grid keys
+        self.grid_keys = self._get_keys(keys, ignore_keys)
+        # assign varkw
+        if kwargs:
+            self.update(kwargs)
+
 
 class GridItemBundle(_BaseGridItem):
     '''Merges GridItems/GridBundles. Merges the dict, keys, and any groups.
@@ -407,33 +462,34 @@ class GridItemBundle(_BaseGridItem):
     '''
     def __init__(self, *grids, name=None, ignore_keys=None):
         merged = {}
-        groups = {}
         keys = []
         for d in grids:
             merged.update(d)
             keys.extend(d.grid_keys or ())
+
+        super().__init__(merged, name)
+        self.grid_keys = self._get_keys(keys, ignore_keys)
+        self.groups = self._gather_groups(grids)
+
+    def _gather_groups(self, grids):
+        groups = {}
+        for d in grids:
             for ki, di in getattr(d, 'groups', {}).items():
                 groups[ki] = dict(groups.get(ki, ()), **di)
             k = d.name
             if k is not None:
                 groups[k] = dict(groups.get(k, ()), **d)
-        if name is not None:
-            groups[name] = dict(groups.get(name, ()), **merged)
-
-        self.name = name
-        if ignore_keys:
-            keys = (k for k in keys if k not in ignore_keys)
-        self.grid_keys = unique(keys)
-        self.groups = groups
-        super().__init__(merged)
+        
+        k = self.name
+        if k is not None:
+            groups[k] = dict(groups.get(k, ()), **self)
+        return groups
+        
 
     def __getitem__(self, key):
         if key in self.groups:
             return self.groups[key]
         return super().__getitem__(key)
-
-    def __getattr__(self, key):
-        return self.__getitem__(key)
 
     def find(self, name):
         return self.groups.get(name)

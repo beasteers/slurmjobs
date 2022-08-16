@@ -127,6 +127,30 @@ def test_filter_grid():
     _compare_grid(g, [{'a': 5}, {'a': 6}, {'a': 7}, {'a': 7, 'b': 10}, {'a': 8, 'aaa': 15}])
 
 
+def test_vararg_grid():
+    g = slurmjobs.Grid([
+        ('something', [1]),
+        ('*', [ (1, 2, 3), (4, 5, 6) ]),
+        ('**', [{'x': 5, 'y': 6}, {'x': 6, 'y': 7}])
+    ])
+    assert list(g) == [
+        {'something': 1, 'x': 5, 'y': 6},
+        {'something': 1, 'x': 6, 'y': 7},
+        {'something': 1, 'x': 5, 'y': 6},
+        {'something': 1, 'x': 6, 'y': 7},
+    ]
+    assert [gi.positional for gi in g] == [
+        (1, 2, 3), (1, 2, 3), (4, 5, 6), (4, 5, 6)
+    ]
+
+    args = slurmjobs.Argument.get('fire')
+    assert [args(gi) for gi in g] == [
+        '1 2 3 --something=1 --x=5 --y=6',
+        '1 2 3 --something=1 --x=6 --y=7',
+        '4 5 6 --something=1 --x=5 --y=6',
+        '4 5 6 --something=1 --x=6 --y=7',
+    ]
+
 
 def _compare_grid(g, expected, no_len=False):
     try:
