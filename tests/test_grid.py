@@ -151,6 +151,15 @@ def test_vararg_grid():
         '4 5 6 --something=1 --x=6 --y=7',
     ]
 
+    jobs = slurmjobs.Jobs("python", name='pos')
+    print([jobs.format_job_id(d) for d in g])
+    assert [jobs.format_job_id(d) for d in g] == [
+        'pos,1,2,3,something-1,x-5,y-6',
+        'pos,1,2,3,something-1,x-6,y-7',
+        'pos,4,5,6,something-1,x-5,y-6',
+        'pos,4,5,6,something-1,x-6,y-7',
+    ]
+
 
 def _compare_grid(g, expected, no_len=False):
     try:

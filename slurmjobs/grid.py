@@ -348,8 +348,8 @@ class Grid(BaseGrid):
         for ds in itertools.product(*grid):
             # expand grid pairs [('a', 'b'), ([1, 2, 3], [1, 2, 3])]
             yield GridItem(
-                dict({k: v for d in ds for k, v in d.items()}, **self.constants), 
-                [k for d in ds for k in d], self.name, 
+                {k: v for d in ds for k, v in d.items()}, 
+                name=self.name, constants=self.constants,
                 ignore_keys=self.ignore_job_id_keys)
 
 
@@ -390,9 +390,8 @@ class LiteralGrid(BaseGrid):
     def __iter__(self):
         for d in self.grid:
             # expand grid pairs [('a', 'b'), ([1, 2, 3], [1, 2, 3])]
-            keys = d.grid_keys if isinstance(d, _BaseGridItem) else list(d)
             yield GridItem(
-                dict(d, **self.constants), keys, self.name, 
+                d, name=self.name, constants=self.constants,
                 ignore_keys=self.ignore_job_id_keys)
             # should we just use dict's internal ordering for the keys?
 
@@ -444,23 +443,28 @@ class GridItem(_BaseGridItem):
     '''Represents a dictionary of arguments, the keys that vary, 
     and a name for the group of args.
     '''
-    def __init__(self, grid=None, keys=(), name=None, positional=(), ignore_keys=None):
+    def __init__(self, grid=None, keys=None, name=None, positional=(), constants=None, ignore_keys=None):
+        if keys is None and isinstance(grid, _BaseGridItem):
+            keys = grid.grid_keys
+
         super().__init__(grid, name)
         # get varargs from grid
         self.positional = tuple(positional or ()) + tuple(super().pop('*', None) or ())
         kwargs = super().pop('**', None)
-        # get grid keys
-        self.grid_keys = self._get_keys(keys, ignore_keys)
-        # assign varkw
         if kwargs:
             self.update(kwargs)
+        # get grid keys
+        self.grid_keys = self._get_keys(keys, ignore_keys)
+        if constants:
+            self.update(constants)
 
 
 class GridItemBundle(_BaseGridItem):
     '''Merges GridItems/GridBundles. Merges the dict, keys, and any groups.
     Can use ``.find(name)`` so search for a subset of items.
     '''
-    def __init__(self, *grids, name=None, ignore_keys=None):
+    def __init__(self, *grids, name=None, constants=None, ignore_keys=None):
+        # combine grids
         merged = {}
         keys = []
         for d in grids:
@@ -470,8 +474,11 @@ class GridItemBundle(_BaseGridItem):
         super().__init__(merged, name)
         self.grid_keys = self._get_keys(keys, ignore_keys)
         self.groups = self._gather_groups(grids)
+        if constants:
+            self.update(constants)
 
     def _gather_groups(self, grids):
+        # put grids into separable named groups
         groups = {}
         for d in grids:
             for ki, di in getattr(d, 'groups', {}).items():
@@ -484,7 +491,6 @@ class GridItemBundle(_BaseGridItem):
         if k is not None:
             groups[k] = dict(groups.get(k, ()), **self)
         return groups
-        
 
     def __getitem__(self, key):
         if key in self.groups:

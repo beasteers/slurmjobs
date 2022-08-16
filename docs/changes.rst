@@ -2,6 +2,16 @@
 Changes
 =============
 
+1.1.2
+-------------
+ - fix varargs not appearing in job ID
+
+
+
+1.1.1
+-------------
+ - add support for ``'*'`` and ``'**'`` which act as varargs to the script. Use ``'*'`` to pass positional arguments
+
 
 1.1.0
 -------------

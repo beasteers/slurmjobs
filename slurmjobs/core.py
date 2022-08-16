@@ -190,7 +190,7 @@ class Jobs:
         v = self.format_id_value(v)
         return f'{k}{self.job_id_key_sep}{v}'
 
-    def format_job_id(self, args, keys=None, name=None, ignore_keys=None):
+    def format_job_id(self, args, keys=None, name=None, ignore_keys=None, skip_positional=False):
         '''Convert a dictionary to a job ID.
 
         Arguments:
@@ -203,6 +203,13 @@ class Jobs:
         name = name or self.name if name is not False else False
         # format each key
         parts = []
+        if not skip_positional:
+            for x in getattr(args, 'positional', ()):
+                formatted = self.format_id_value(x)
+                if formatted is None or formatted == '':
+                    continue
+                parts.append(formatted)
+
         keys = getattr(args, 'grid_keys', args) if keys is None else keys
         for k in keys or ():
             if ignore_keys and k in ignore_keys:
