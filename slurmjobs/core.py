@@ -385,8 +385,8 @@ class Slurm(Jobs):
         # sbatch arguments
         # see: https://slurm.schedmd.com/sbatch.html
         sbatch={
-            'time': '3-0',
-            'mem': '48GB',
+            # 'time': '3-0',
+            # 'mem': '48GB',
             # 'n_gpus': None,
             # 'n_cpus': None,
             # 'nodes': None,
@@ -481,12 +481,15 @@ class Singularity(Slurm):
     sif_dir = '/scratch/work/public/singularity/'
     options = dict(
         Slurm.options,
-        sif='cuda11.0-cudnn8-devel-ubuntu18.04.sif',
+        sif='cuda11.3.0-cudnn8-devel-ubuntu20.04.sif',
         overlay='overlay-5GB-200K.ext3',
         readonly=True,
         overlays=None,
         readonly_overlays=None,
-        singularity_init_script='source /ext3/env.sh',
+        singularity_init_script='''
+[[ -f /ext3/env.sh ]] && source /ext3/env.sh
+[[ -f /ext3/env ]] && source /ext3/env
+''',
     )
     template = '''{% extends 'job.singularity.j2' %}
     '''
