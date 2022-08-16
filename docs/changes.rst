@@ -2,6 +2,12 @@
 Changes
 =============
 
+
+1.1.2
+-------------
+ - unset default sbatch args ``time`` and ``mem`` as they were arbitrary
+ - change default sif to cuda11.3.0-cudnn8-devel-ubuntu20.04.sif
+
 1.1.2
 -------------
  - fix varargs not appearing in job ID
